@@ -1,0 +1,128 @@
+{% extends "base3.html" %}
+{% load static %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+    
+    <div class="mb-12 flex flex-col sm:flex-row sm:justify-between sm:items-end">
+        <div>
+            <span class="text-sm font-semibold uppercase text-indigo-500 tracking-wide">Group Management</span>
+            <h1 class="text-4xl font-bold text-gray-900 mt-1">{{ group.name }}</h1>
+        </div>
+        
+        {% if user.profile in group_admins or user.profile == group.admin %}
+            <a href="{% url 'edit_group' group.id %}" 
+                class="mt-4 sm:mt-0 inline-flex items-center px-6 py-3 mb-3 text-base font-medium rounded-full text-blue-600 bg-blue-100 hover:bg-blue-200 shadow-md transition-shadow">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                Edit Group Settings
+            </a>
+        {% endif %}
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        <div class="lg:col-span-1">
+            <div class="bg-white rounded-2xl shadow-xl overflow-hidden">
+                {% if group.cover_image %}
+                    <img src="{{ group.cover_image.url }}" alt="{{ group.name }}" class="w-full h-48 object-cover">
+                {% else %}
+                    <div class="w-full h-48 bg-gradient-to-r from-teal-400 to-cyan-500 flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-white opacity-90" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                    </div>
+                {% endif %}
+                
+                <div class="p-6 space-y-4">
+                    <h3 class="text-2xl font-semibold text-gray-800 border-b pb-3">Description</h3>
+                    <p class="text-gray-600 text-base">{{ group.description|default:"The group's purpose and mission will be detailed here." }}</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="lg:col-span-2 space-y-8">
+            
+            <div class="bg-white rounded-2xl shadow-xl overflow-hidden">
+                <div class="grid grid-cols-2 divide-x divide-gray-200">
+                    <div class="p-6">
+                        <a href="{% url 'group_members_table' group.id %}" class="block hover:text-indigo-600 transition-colors group">
+                            <h3 class="text-2xl font-semibold text-gray-800 mb-4 group-hover:text-indigo-600 flex items-center gap-2">
+                                Members ({{ count_members }})
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                </svg>
+                            </h3>
+                        </a>
+                       
+                    </div>
+                    <div class="p-6 bg-gray-50">
+                        <h3 class="text-2xl font-semibold text-gray-800 mb-4">Admins ({{ count_admins }})</h3>
+                        <div class="flex flex-wrap gap-2">
+                            {% for admin in group_admins %}
+                                <span class="inline-flex items-center px-4 py-1.5 text-sm font-bold bg-indigo-100 text-indigo-800 rounded-full border border-indigo-300 shadow-sm">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1.5" viewBox="0 0 20 20" fill="currentColor">
+                                        <path d="M7 10a2 2 0 114 0 2 2 0 01-4 0z" />
+                                        <path fill-rule="evenodd" d="M10 2a8 8 0 100 16 8 8 0 000-16zm-7 8a7 7 0 1114 0 7 7 0 01-14 0z" clip-rule="evenodd" />
+                                    </svg>
+                                    {{ admin }}
+                                </span>
+                            {% empty %}
+                                <p class="text-gray-500 text-sm">No administrators assigned.</p>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-xl overflow-hidden  border-red-400">
+                <div class="px-6 py-4 border-red-300 bg-red-100">
+                    <h3 class="text-2xl font-bold text-red-800">In Memoriam ({{ deceased.count }})</h3>
+                </div>
+                <div class="p-6 space-y-4">
+                    {% if deceased %}
+                        {% for member in deceased %}
+                            <div class="p-5 bg-white rounded-xl border border-gray-200 shadow-md">
+                                <div class="flex justify-between items-start">
+                                    <div>
+                                        <h4 class="font-bold text-lg text-gray-900">{{ member.deceased }}</h4>
+                                        <p class="text-sm text-gray-600 mt-1">
+                                            Date of Passing: <span class="font-medium text-red-600">{{ member.date }}</span>
+                                        </p>
+                                        <p class="text-xs text-gray-500 mt-1">
+                                            Reported by: {{ member.group_admin }}
+                                        </p>
+                                    </div>
+                                    
+                                    {% if user.profile in group_admins or user.profile == group.admin %}
+                                        <div class="flex-shrink-0" id="cont-action-{{ member.id }}">
+                                            {% if member.cont_is_active %}
+                                                <button hx-post="{% url 'stop_contributions' member.id %}"
+                                                        hx-target="#cont-action-{{ member.id }}"
+                                                        hx-swap="outerHTML"
+                                                        class="px-3 py-1 text-sm font-semibold rounded-full text-white bg-red-600 hover:bg-red-700 transition-colors shadow-lg">
+                                                    Contributions OPEN
+                                                </button>
+                                            {% else %}
+                                                <span class="inline-flex items-center px-3 py-1 text-sm font-semibold rounded-full bg-green-100 text-green-800">
+                                                    CLOSED
+                                                </span>
+                                            {% endif %}
+                                        </div>
+                                    {% endif %}
+
+                                </div>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-gray-500 text-base italic text-center py-4">All group members are accounted for.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}
