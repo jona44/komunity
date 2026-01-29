@@ -12,8 +12,6 @@ ALLOWED_HOSTS = ['chemaonline.azurewebsites.net','127.0.0.1','chema.com','localh
 CSRF_TRUSTED_ORIGINS = ['https://chemaonline.azurewebsites.net','https://127.0.0.1','https://chema.com']
 
 
-
-
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -28,8 +26,6 @@ INSTALLED_APPS = [
     'condolence',
     'crispy_forms',
     'crispy_tailwind',
-    
-    
     
     'allauth',
     'allauth.account',
@@ -154,12 +150,10 @@ EMAIL_HOST_USER ='manyadzatocky@gmail.com'
 EMAIL_HOST_PASSWORD = '@manymore41'
 
 # django-allauth configuration
-
 ACCOUNT_LOGIN_METHODS = {'email'}
 ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1*', 'password2*']
 ACCOUNT_USER_MODEL_USERNAME_FIELD = None
 ACCOUNT_EMAIL_VERIFICATION = 'none' # Can be 'mandatory' in production
-# ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1*', 'password2*'] # Not a standard allauth setting for 0.55.0
 
 SITE_ID = 1
 
