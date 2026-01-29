@@ -1,0 +1,147 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ profile.first_name }}'s Profile{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-900 py-8 px-4">
+    <div class="max-w-4xl mx-auto">
+        <!-- Header with Edit Button -->
+        <div class="flex justify-between items-center mb-8">
+            <div>
+                <h1 class="text-3xl font-bold text-white mb-2">My Profile</h1>
+                <p class="text-gray-400">View and manage your personal information</p>
+            </div>
+            <a href="{% url 'profile_edit' %}" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg transition duration-200">
+                Edit Profile
+            </a>
+        </div>
+
+        <!-- Completion Status -->
+        {% if not profile.is_complete %}
+        <div class="bg-yellow-500 bg-opacity-10 border border-yellow-500 text-yellow-400 px-4 py-3 rounded-lg mb-6">
+            <p class="font-medium">⚠️ Your profile is incomplete</p>
+            <p class="text-sm mt-1">Please complete all required fields to unlock full features.</p>
+        </div>
+        {% endif %}
+
+        <!-- Profile Card -->
+        <div class="bg-gray-800 rounded-lg shadow-xl overflow-hidden">
+            <!-- Profile Header -->
+            <div class="bg-gradient-to-r from-blue-600 to-purple-600 h-32"></div>
+            
+            <!-- Profile Picture and Basic Info -->
+            <div class="relative px-6 pb-6">
+                <div class="flex flex-col md:flex-row md:items-end md:space-x-6 -mt-16">
+                    <!-- Profile Picture -->
+                    <div class="flex-shrink-0 mb-4 md:mb-0">
+                        {% if profile.profile_picture %}
+                        <img src="{{ profile.profile_picture.url }}" alt="{{ profile.first_name }}" class="w-32 h-32 rounded-full border-4 border-gray-800 object-cover">
+                        {% else %}
+                        <div class="w-32 h-32 rounded-full border-4 border-gray-800 bg-gray-700 flex items-center justify-center">
+                            <span class="text-4xl text-gray-400">{{ profile.first_name|first|upper }}{{ profile.surname|first|upper }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Name and Email -->
+                    <div class="flex-1">
+                        <h2 class="text-2xl font-bold text-white">{{ profile.first_name }} {{ profile.surname }}</h2>
+                        <p class="text-gray-400 mt-1">{{ user.email }}</p>
+                        {% if profile.traditional_names %}
+                        <p class="text-gray-500 text-sm mt-1">{{ profile.traditional_names }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bio Section -->
+            {% if profile.bio %}
+            <div class="px-6 pb-6">
+                <div class="bg-gray-700 rounded-lg p-4">
+                    <h3 class="text-sm font-medium text-gray-400 mb-2">BIO</h3>
+                    <p class="text-gray-200">{{ profile.bio }}</p>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Personal Information -->
+            <div class="px-6 pb-6">
+                <h3 class="text-xl font-semibold text-white mb-4 border-b border-gray-700 pb-2">Personal Information</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {% if profile.date_of_birth %}
+                    <div>
+                        <p class="text-sm text-gray-400 mb-1">Date of Birth</p>
+                        <p class="text-gray-200">{{ profile.date_of_birth|date:"F d, Y" }}</p>
+                    </div>
+                    {% endif %}
+                    
+                    {% if profile.contact_number %}
+                    <div>
+                        <p class="text-sm text-gray-400 mb-1">Contact Number</p>
+                        <p class="text-gray-200">{{ profile.contact_number }}</p>
+                    </div>
+                    {% endif %}
+                    
+                    <div>
+                        <p class="text-sm text-gray-400 mb-1">Member Since</p>
+                        <p class="text-gray-200">{{ profile.created_at|date:"F Y" }}</p>
+                    </div>
+                    
+                    <div>
+                        <p class="text-sm text-gray-400 mb-1">Last Updated</p>
+                        <p class="text-gray-200">{{ profile.updated_at|date:"F d, Y" }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cultural & Spiritual Information -->
+            {% if profile.cultural_background or profile.religious_affiliation or profile.spiritual_beliefs %}
+            <div class="px-6 pb-6">
+                <h3 class="text-xl font-semibold text-white mb-4 border-b border-gray-700 pb-2">Cultural & Spiritual Information</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {% if profile.cultural_background %}
+                    <div>
+                        <p class="text-sm text-gray-400 mb-1">Cultural Background</p>
+                        <p class="text-gray-200">{{ profile.cultural_background }}</p>
+                    </div>
+                    {% endif %}
+                    
+                    {% if profile.religious_affiliation %}
+                    <div>
+                        <p class="text-sm text-gray-400 mb-1">Religious Affiliation</p>
+                        <p class="text-gray-200">{{ profile.religious_affiliation }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                {% if profile.spiritual_beliefs %}
+                <div class="mt-4">
+                    <p class="text-sm text-gray-400 mb-1">Spiritual Beliefs</p>
+                    <p class="text-gray-200">{{ profile.spiritual_beliefs }}</p>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <!-- Account Status -->
+            <div class="px-6 pb-6">
+                <h3 class="text-xl font-semibold text-white mb-4 border-b border-gray-700 pb-2">Account Status</h3>
+                <div class="flex flex-wrap gap-2">
+                    {% if profile.is_complete %}
+                    <span class="bg-green-500 bg-opacity-20 text-green-400 px-3 py-1 rounded-full text-sm">✓ Complete</span>
+                    {% else %}
+                    <span class="bg-yellow-500 bg-opacity-20 text-yellow-400 px-3 py-1 rounded-full text-sm">⚠ Incomplete</span>
+                    {% endif %}
+                    
+                    {% if profile.is_active %}
+                    <span class="bg-blue-500 bg-opacity-20 text-blue-400 px-3 py-1 rounded-full text-sm">Active</span>
+                    {% else %}
+                    <span class="bg-gray-500 bg-opacity-20 text-gray-400 px-3 py-1 rounded-full text-sm">Inactive</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
