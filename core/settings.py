@@ -26,6 +26,7 @@ INSTALLED_APPS = [
     'condolence',
     'crispy_forms',
     'crispy_tailwind',
+    'wallet',
     
     'allauth',
     'allauth.account',

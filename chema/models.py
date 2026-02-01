@@ -24,6 +24,10 @@ class Group(models.Model):
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True,null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
+    
+    # Wallet Integration
+    external_wallet_id = models.CharField(max_length=100, unique=True, null=True, blank=True)
+
     def get_admins(self):
         return self.members.filter(groupmembership__is_admin=True)
     
@@ -99,7 +103,7 @@ class GroupMembership(models.Model):
     join_message = models.TextField(blank=True, help_text="Message when requesting to join")
     
     def __str__(self):
-        return f"{self.member.user.username} in {self.group.name}"
+        return f"{self.member.full_name} in {self.group.name}"
     
     def get_is_admin(self):
         return self.is_admin
@@ -126,7 +130,7 @@ class Post(models.Model):
     approved = models.BooleanField(default=True, null=True, blank=True)
 
     def __str__(self):
-        return f"{self.author.user.username}: {self.content}"
+        return f"{self.author.full_name}: {self.content}"
 
 
 
@@ -149,7 +153,7 @@ class Comment(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.author.user.username}: {self.content}"
+        return f"{self.author.full_name}: {self.content}"
 
 
 class Reply(models.Model):
@@ -159,7 +163,7 @@ class Reply(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
 
     def __str__(self):
-        return f'Reply by {self.author.user.username} -> {self.content}'
+        return f'Reply by {self.author.full_name} -> {self.content}'
 
     class Meta:
         verbose_name_plural = "Replies"

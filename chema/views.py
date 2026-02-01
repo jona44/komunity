@@ -554,8 +554,8 @@ def search_view(request):
     query = request.GET.get('q', '')
     
     if request.headers.get('HX-Request'):
-        groups = Group.objects.filter(Q(name__icontains=query) | Q(members__user__username__icontains=query))
-        profiles = Profile.objects.filter(user__username__icontains=query)
+        groups = Group.objects.filter(Q(name__icontains=query) | Q(members__user__email__icontains=query) | Q(members__first_name__icontains=query) | Q(members__surname__icontains=query)).distinct()
+        profiles = Profile.objects.filter(Q(user__email__icontains=query) | Q(first_name__icontains=query) | Q(surname__icontains=query))
         
         context = {
             'groups': groups,
@@ -567,8 +567,8 @@ def search_view(request):
     # Fallback for non-HTMX (or keep existing JSON logic if needed, but HTMX is preferred)
     # Keeping JSON for now just in case, but using the new query logic
     results = (
-        list(Group.objects.filter(Q(name__icontains=query) | Q(members__user__username__icontains=query)).values()) +
-        list(Profile.objects.filter(user__username__icontains=query).values())
+        list(Group.objects.filter(Q(name__icontains=query) | Q(members__user__email__icontains=query) | Q(members__first_name__icontains=query) | Q(members__surname__icontains=query)).distinct().values()) +
+        list(Profile.objects.filter(Q(user__email__icontains=query) | Q(first_name__icontains=query) | Q(surname__icontains=query)).values())
     )
     return JsonResponse({'results': results})
 
@@ -665,6 +665,23 @@ def group_discovery(request):
 
 
 @login_required
+def my_groups(request):
+    """Page showing the user's groups."""
+    user = request.user.profile
+    groups = user.groups.all()
+    active_group = groups.filter(is_active=True).first() or groups.first()
+    
+    admins_as_members = active_group.get_admins() if active_group else []
+    
+    context = {
+        'groups': groups,
+        'active_group': active_group,
+        'admins_as_members': admins_as_members,
+    }
+    return render(request, 'chema/my_groups.html', context)
+
+
+@login_required
 def group_list(request):
     """List all groups for users to browse and join."""
     groups = Group.objects.all().annotate(member_count=Count('members'))
@@ -738,9 +755,10 @@ def upload_csv(request):
                     password2 = fields[3]
 
                     if password1 == password2:
-                        User.objects.create_user(username=username, email=email, password=password1)
+                        # CustomUser expects email as the first argument in create_user
+                        CustomUser.objects.create_user(email=email, password=password1)
                     else:
-                        return HttpResponse('Passwords do not match for user {}'.format(username), status=400)
+                        return HttpResponse('Passwords do not match for user {}'.format(email), status=400)
 
             return HttpResponse('Data uploaded successfully')
         else:

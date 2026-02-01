@@ -2,7 +2,7 @@
 {% load static tailwind_tags %}
 
 {% block content %}
-<div class="w-full space-y-6 pb-10 ">
+<div class="max-w-4xl mx-auto space-y-6 pb-10 mt-4">
 
     <!-- Group Cover -->
     <div class="relative w-full rounded-xl overflow-hidden shadow-xl group h-50">
@@ -64,7 +64,7 @@
                         </div>
                     </div>
                     <div>
-                        <div class="font-bold">{{ post.author.user }}</div>
+                        <div class="font-bold">{{ post.author.full_name }}</div>
                         <div class="text-xs text-gray-500">{{ post.created_at|timesince }} ago</div>
                     </div>
                 </div>
@@ -160,7 +160,7 @@
                             <div class="flex-1">
 
                                 <div class="flex justify-between">
-                                    <div class="font-bold text-sm">{{ comment.author }}</div>
+                                    <div class="font-bold text-sm">{{ comment.author.full_name }}</div>
                                     <div class="text-xs text-gray-400">{{ comment.created_at|timesince }}</div>
                                 </div>
 
@@ -196,7 +196,7 @@
                                                 </div>
                                             </div>
                                             <div>
-                                                <span class="font-bold text-xs">{{ reply.author }}</span>
+                                                <span class="font-bold text-xs">{{ reply.author.full_name }}</span>
                                                 <p class="text-gray-600">{{ reply.content }}</p>
                                             </div>
                                         </div>

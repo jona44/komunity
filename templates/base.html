@@ -41,24 +41,10 @@
 
     <!-- Main Layout -->
     <main class="fixed inset-0 top-16 overflow-hidden">
-        <div class="container mx-auto px-4 h-full ">
-            <div class="grid grid-cols-1 lg:grid-cols-12 gap-3 h-full ">
-
-                <!-- Left Sidebar - Fixed -->
-                <aside class="hidden lg:block lg:col-span-3 overflow-y-auto h-full mt-3 scrollbar-hide">
-                    {% include 'partials/left_side.html' %}
-                </aside>
-
-                <!-- Main Content - Scrollable without visible scrollbar -->
-                <section id="main-content" class="lg:col-span-6 w-full overflow-y-auto h-full mt-3 scrollbar-hide">
-                    {% block content %}
-                    {% endblock %}
-                </section>
-
-                <!-- Right Sidebar - Fixed -->
-                <aside class="hidden lg:block lg:col-span-3 overflow-y-auto h-full mt-3">
-                    {% include 'partials/right_side.html' %}
-                </aside>
+        <div id="main-content" class="h-full overflow-y-auto scrollbar-hide">
+            <div class="container mx-auto px-4 pb-20">
+                {% block content %}
+                {% endblock %}
             </div>
         </div>
     </main>

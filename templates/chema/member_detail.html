@@ -11,7 +11,7 @@
       <div class="card">
         <div class="card-header "><span class="text-orange"><h4>Profile Info:</h4></span></div>
         <div class="card-body">
-          <img src="{{ member.profile_pic.url }}" alt="{{ member.user.username }}" class="img-fluid">
+          <img src="{{ member.profile_pic.url }}" alt="{{ member.full_name }}" class="img-fluid">
           <p class="text-danger"><strong>Username:</strong> <span >{{ object }}</span></p>
           <p class="text-danger"><strong>Bio:</strong> <span >{{ bio }}</span></p>
           <p class="text-danger"><strong>Phone:</strong> <span >{{ phone }}</span></p>
@@ -71,7 +71,7 @@
         <div class="card">
           <div class="card-header "><span class="text-orange"><h4>Profile Info:</h4></span></div>
           <div class="card-body">
-            <img src="{{ member.profile_pic.url }}" alt="{{ member.user.username }}" class="img-fluid">
+            <img src="{{ member.profile_pic.url }}" alt="{{ member.full_name }}" class="img-fluid">
             <p><strong>Username:</strong> {{ object }}</p>
             <p><strong>Bio:</strong> {{ bio }}</p>
             <p><strong>Phone:</strong> {{ phone }}</p>

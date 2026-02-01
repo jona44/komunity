@@ -38,6 +38,7 @@ urlpatterns = [
     
     path('group-discovery/', views.group_discovery, name='group_discovery'),
     path('group-list/', views.group_list, name='group_list'),
+    path('my-groups/', views.my_groups, name='my_groups'),
     
     path('upload_csv/', views.upload_csv, name='upload_csv'),
    

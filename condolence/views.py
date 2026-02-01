@@ -289,3 +289,20 @@ def search_contributions(request):
     }
     
     return render(request, 'condolence/partials/contributions_list.html', context)
+
+
+@login_required
+def contributions_list(request):
+    """Page showing the list of contributions."""
+    active_group = Group.objects.filter(is_active=True).first()
+    deceased = Deceased.objects.filter(group=active_group)
+    contributions = Contribution.objects.filter(group=active_group).order_by('-contribution_date')
+    total_contributions = contributions.aggregate(Sum('amount'))['amount__sum'] or 0
+    
+    context = {
+        'active_group': active_group,
+        'deceased': deceased,
+        'contributions': contributions,
+        'total_contributions': total_contributions,
+    }
+    return render(request, 'condolence/contributions_page.html', context)

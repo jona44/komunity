@@ -4,24 +4,21 @@ from django.contrib.auth.models import User
 from django.contrib.auth.forms import UserCreationForm
 
 
-class UserRegisterForm(UserCreationForm):
-    email = forms.EmailField()
+class UserRegisterForm(forms.ModelForm):
+    email = forms.EmailField(widget=forms.TextInput(attrs={'class':'form-controls' }))
+    password1 = forms.CharField(widget=forms.PasswordInput(attrs={'class':'form-controls' }))
+    password2 = forms.CharField(widget=forms.PasswordInput(attrs={'class':'form-controls' }))
+    
     class Meta:
-        model  = User
-        fields = ['username','email','password1', 'password2']
-        
-        widgets = {
-            'username': forms.TextInput(attrs={'class':'form-controls' }),
-            'email': forms.TextInput(attrs={'class':'form-controls' }),
-            'password1': forms.TextInput(attrs={'class':'form-controls' }),
-            'password2': forms.TextInput(attrs={'class':'form-controls' }),
-        }
+        model  = CustomUser
+        fields = ['email']
+
         
 class UserUpdateForm(forms.ModelForm):
     email = forms.EmailField()
     class Meta:
-        model  = User
-        fields = ['username', 'email']
+        model  = CustomUser
+        fields = ['email']
         
 class ProfileForm(forms.ModelForm):
     class Meta:

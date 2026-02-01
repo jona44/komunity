@@ -19,7 +19,7 @@
                 {% for profile in profiles %}
                 <li>
                     <a href="{% url 'member_detail' group_id=active_group.id member_id=profile.id %}" class="flex items-center gap-2 hover:bg-orange-50">
-                        <span class="font-medium">{{ profile.user.username }}</span>
+                        <span class="font-medium">{{ profile.full_name }}</span>
                     </a>
                 </li>
                 {% endfor %}
