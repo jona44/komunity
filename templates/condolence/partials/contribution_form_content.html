@@ -3,6 +3,7 @@
       action="{% url 'create_contribution' %}" 
       hx-post="{% url 'create_contribution' %}"
       hx-target="#contribution_form_container"
+      hx-swap="innerHTML"
       class="space-y-4">
     {% csrf_token %}
     
@@ -17,7 +18,15 @@
         <label class="label">
             <span class="label-text font-medium text-gray-700">Contributor</span>
         </label>
-        {{ form.contributing_member }}
+        {% if form.contributing_member.field.widget.input_type == 'hidden' %}
+            <div class="px-3 py-2 bg-gray-100 rounded-lg text-gray-700 font-medium border border-gray-200">
+                Recording for: <span class="text-blue-600">{{ contributing_member_name|default:"Selected Member" }}</span>
+            </div>
+            <!-- Render the hidden field so the value is submitted -->
+            {{ form.contributing_member }}
+        {% else %}
+            {{ form.contributing_member }}
+        {% endif %}
         {% if form.contributing_member.errors %}
         <span class="text-error text-xs mt-1">{{ form.contributing_member.errors.0 }}</span>
         {% endif %}
@@ -56,6 +65,17 @@
         </div>
         {% if form.amount.errors %}
         <span class="text-error text-xs mt-1">{{ form.amount.errors.0 }}</span>
+        {% endif %}
+    </div>
+
+    <!-- Payment Method -->
+    <div class="form-control">
+        <label class="label">
+            <span class="label-text font-medium text-gray-700">Payment Method</span>
+        </label>
+        {{ form.payment_method }}
+        {% if form.payment_method.errors %}
+        <span class="text-error text-xs mt-1">{{ form.payment_method.errors.0 }}</span>
         {% endif %}
     </div>
 

@@ -30,8 +30,30 @@ def active_group_context(request):
             pass
             
     # Fallback to default active group logic if not in a specific group view
+    if not active_group and request.user.is_authenticated:
+        try:
+            # Look for the user's active membership
+            active_membership = GroupMembership.objects.filter(
+                member=request.user.profile, 
+                is_active=True
+            ).first()
+            
+            # If no membership is marked active, pick the first one
+            if not active_membership:
+                active_membership = GroupMembership.objects.filter(
+                    member=request.user.profile
+                ).first()
+                if active_membership:
+                    active_membership.is_active = True
+                    active_membership.save()
+            
+            if active_membership:
+                active_group = active_membership.group
+        except (Profile.DoesNotExist, AttributeError):
+            pass
+            
+    # Global fallback for unauthenticated users or if no memberships exist
     if not active_group:
-        # Logic to determine active group - currently just picking the first active one
         active_group = Group.objects.filter(is_active=True).first()
     
     if active_group:

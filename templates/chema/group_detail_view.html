@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block content %}
-<div class="max-w-5xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+<div class="max-w-8xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
     
     <div class="mb-12 flex flex-col sm:flex-row sm:justify-between sm:items-end">
         <div>
@@ -10,7 +10,7 @@
             <h1 class="text-4xl font-bold text-gray-900 mt-1">{{ group.name }}</h1>
         </div>
         
-        {% if user.profile in group_admins or user.profile == group.admin %}
+        {% if is_manager or user.profile == group.admin %}
             <a href="{% url 'edit_group' group.id %}" 
                 class="mt-4 sm:mt-0 inline-flex items-center px-6 py-3 mb-3 text-base font-medium rounded-full text-blue-600 bg-blue-100 hover:bg-blue-200 shadow-md transition-shadow">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -59,18 +59,18 @@
                        
                     </div>
                     <div class="p-6 bg-gray-50">
-                        <h3 class="text-2xl font-semibold text-gray-800 mb-4">Admins ({{ count_admins }})</h3>
+                        <h3 class="text-2xl font-semibold text-gray-800 mb-4">Managers ({{ count_managers }})</h3>
                         <div class="flex flex-wrap gap-2">
-                            {% for admin in group_admins %}
+                            {% for manager in group_managers %}
                                 <span class="inline-flex items-center px-4 py-1.5 text-sm font-bold bg-indigo-100 text-indigo-800 rounded-full border border-indigo-300 shadow-sm">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1.5" viewBox="0 0 20 20" fill="currentColor">
                                         <path d="M7 10a2 2 0 114 0 2 2 0 01-4 0z" />
                                         <path fill-rule="evenodd" d="M10 2a8 8 0 100 16 8 8 0 000-16zm-7 8a7 7 0 1114 0 7 7 0 01-14 0z" clip-rule="evenodd" />
                                     </svg>
-                                    {{ admin }}
+                                    {{ manager }}
                                 </span>
                             {% empty %}
-                                <p class="text-gray-500 text-sm">No administrators assigned.</p>
+                                <p class="text-gray-500 text-sm">No managers assigned.</p>
                             {% endfor %}
                         </div>
                     </div>
@@ -78,47 +78,99 @@
             </div>
 
             <div class="bg-white rounded-2xl shadow-xl overflow-hidden  border-red-400">
-                <div class="px-6 py-4 border-red-300 bg-red-100">
+                <div class="px-6 py-4 border-red-300 bg-red-100 flex justify-between items-center">
                     <h3 class="text-2xl font-bold text-red-800">In Memoriam ({{ deceased.count }})</h3>
-                </div>
-                <div class="p-6 space-y-4">
-                    {% if deceased %}
-                        {% for member in deceased %}
-                            <div class="p-5 bg-white rounded-xl border border-gray-200 shadow-md">
-                                <div class="flex justify-between items-start">
-                                    <div>
-                                        <h4 class="font-bold text-lg text-gray-900">{{ member.deceased }}</h4>
-                                        <p class="text-sm text-gray-600 mt-1">
-                                            Date of Passing: <span class="font-medium text-red-600">{{ member.date }}</span>
-                                        </p>
-                                        <p class="text-xs text-gray-500 mt-1">
-                                            Reported by: {{ member.group_admin }}
-                                        </p>
-                                    </div>
-                                    
-                                    {% if user.profile in group_admins or user.profile == group.admin %}
-                                        <div class="flex-shrink-0" id="cont-action-{{ member.id }}">
-                                            {% if member.cont_is_active %}
-                                                <button hx-post="{% url 'stop_contributions' member.id %}"
-                                                        hx-target="#cont-action-{{ member.id }}"
-                                                        hx-swap="outerHTML"
-                                                        class="px-3 py-1 text-sm font-semibold rounded-full text-white bg-red-600 hover:bg-red-700 transition-colors shadow-lg">
-                                                    Contributions OPEN
-                                                </button>
-                                            {% else %}
-                                                <span class="inline-flex items-center px-3 py-1 text-sm font-semibold rounded-full bg-green-100 text-green-800">
-                                                    CLOSED
-                                                </span>
-                                            {% endif %}
-                                        </div>
-                                    {% endif %}
-
-                                </div>
-                            </div>
-                        {% endfor %}
-                    {% else %}
-                        <p class="text-gray-500 text-base italic text-center py-4">All group members are accounted for.</p>
+                    {% if is_manager %}
+                    <button onclick="deceased_modal.showModal()" 
+                            class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-full text-white bg-red-600 hover:bg-red-700 shadow-lg transition-all transform hover:scale-105 active:scale-95">
+                        <span class="material-icons text-sm mr-2">person_remove</span>
+                        Declare Deceased
+                    </button>
                     {% endif %}
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm text-gray-600">
+                        <thead class="bg-gray-50 text-gray-700 uppercase font-semibold">
+                            <tr>
+                                <th class="px-6 py-4">Deceased Member</th>
+                                <th class="px-6 py-4">Date of Passing</th>
+                                <th class="px-6 py-4">Reported By</th>
+                                <th class="px-6 py-4">Contributions</th>
+                                {% if is_manager %}
+                                <th class="px-6 py-4 text-center">Actions</th>
+                                {% endif %}
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200">
+                            {% for member in deceased %}
+                            <tr class="hover:bg-gray-50 transition-colors">
+                                <td class="px-6 py-4">
+                                    <div class="flex items-center gap-3">
+                                        <div class="avatar">
+                                            <div class="w-10 h-10 rounded-full border-2 border-red-100">
+                                                {% if member.deceased.profile_picture %}
+                                                    <img src="{{ member.deceased.profile_picture.url }}" alt="{{ member.deceased.full_name }}" />
+                                                {% else %}
+                                                    <div class="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 font-bold">
+                                                        {{ member.deceased.full_name|slice:":1"|upper }}
+                                                    </div>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        <div class="font-bold text-gray-900">{{ member.deceased.full_name }}</div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <span class="inline-flex items-center text-red-600 font-medium">
+                                        <span class="material-icons text-xs mr-1">event</span>
+                                        {{ member.date|date:"M d, Y" }}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 text-gray-500">
+                                    {{ member.group_admin.full_name|default:"System" }}
+                                </td>
+                                <td class="px-6 py-4">
+                                    {% if member.cont_is_active %}
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5"></span>
+                                            Active
+                                        </span>
+                                    {% else %}
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-gray-400 mr-1.5"></span>
+                                            Closed
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                {% if is_manager %}
+                                <td class="px-6 py-4 text-center">
+                                    <div id="cont-action-{{ member.id }}">
+                                        {% if member.cont_is_active %}
+                                            <button hx-post="{% url 'stop_contributions' member.id %}"
+                                                    hx-target="#cont-action-{{ member.id }}"
+                                                    hx-swap="outerHTML"
+                                                    class="text-red-600">
+                                                Stop Contributions
+                                            </button>
+                                        {% else %}
+                                            <span class="text-xs text-gray-400 italic">No actions available</span>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                {% endif %}
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5" class="px-6 py-12 text-center">
+                                    <div class="flex flex-col items-center">
+                                        <span class="material-icons text-4xl text-gray-200 mb-2">sentiment_satisfied</span>
+                                        <p class="text-gray-500 italic">No deceased members recorded in this group.</p>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
             </div>
 

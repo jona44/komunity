@@ -3,6 +3,7 @@ from django.http import HttpResponse, JsonResponse,HttpResponseRedirect, Http404
 from django.contrib.auth.decorators import login_required
 from .models import *
 from django.urls import reverse 
+from django.db.models import Sum
 from django.forms import inlineformset_factory 
 from django.contrib import messages
 from condolence.models import Contribution,Deceased
@@ -15,34 +16,26 @@ from django.core.exceptions import PermissionDenied
 @login_required
 def home(request):
     user = request.user.profile
-    # groups = Group.objects.filter(members=request.user.profile)
     search_form = SearchForm()
     
-    deceased      = Deceased.objects.filter(group__is_active=True)
-    contributions = Contribution.objects.filter(deceased_member_id__contributions_open=True, group__is_active=True)
-
-    grouped_data = []
-
     # Get the active group based on user membership
-    # Priority:
-    # 1. URL param (if we were passing it, but home is usually default)
-    # 2. First group user is a member of that is marked active (if applicable)
-    # 3. Any group user is a member of
+    active_membership = GroupMembership.objects.filter(member=user, is_active=True).first()
     
-    # Simple logic: Access the first group the user is a member of
-    user_groups = user.groups.all()
-    
-    if not user_groups.exists():
-        # User is not in any group - show discovery/welcome state
+    if not active_membership:
+        active_membership = GroupMembership.objects.filter(member=user).first()
+        if active_membership:
+            active_membership.is_active = True
+            active_membership.save()
+
+    if not active_membership:
         return redirect('group_discovery')
 
-    # Default to the first group for the home feed
-    # You might want to store 'last_viewed_group' in session or profile later
-    active_group = user_groups.first()
+    active_group = active_membership.group
 
-    if active_group is None:
-        # User not in any group or groups deleted
-        return redirect('group_discovery')
+    deceased      = Deceased.objects.filter(group=active_group)
+    contributions = Contribution.objects.filter(deceased_member_id__contributions_open=True, group=active_group)
+
+
 
     # Fetch only the posts of the active group
     active_group_posts = Post.objects.filter(group=active_group).order_by('-created_at')
@@ -64,20 +57,23 @@ def home(request):
 
     deceased_form = DeceasedForm(active_group=active_group)
 
-    return render(request, 'chema/home.html', {
-
-        'grouped_data': [group_data],  # Only the active group data
-        # 'groups': groups,f
+    context = {
+        'grouped_data': [group_data],
         'search_form': search_form,
         'active_group': active_group,
         'active_group_posts': active_group_posts,
         'active_group_comments': active_group_comments,
-        'contributions':contributions,
+        'contributions': contributions,
         'admins_as_members': active_group.get_admins(),
-        'deceased':deceased,
+        'deceased': deceased,
         'deceased_form': deceased_form,
-        
-    })
+    }
+
+    # Handle HTMX partial refresh for posts
+    if request.headers.get('HX-Request') and request.headers.get('HX-Target') == 'posts-list':
+        return render(request, 'chema/partials/posts_list.html', context)
+
+    return render(request, 'chema/home.html', context)
 
 
 
@@ -208,7 +204,8 @@ def edit_group(request, group_id):
     group = get_object_or_404(Group, id=group_id)
     
     # Check if user is admin of this group
-    is_admin = group.admin == request.user.profile or request.user.profile in group.get_admins()
+    membership = GroupMembership.objects.filter(group=group, member=request.user.profile).first()
+    is_admin = membership and (membership.is_admin or membership.role in ['admin', 'moderator'] or group.creator == request.user or group.admin == request.user.profile)
     
     if not is_admin:
         messages.error(request, 'You do not have permission to edit this group.')
@@ -274,9 +271,11 @@ def create_post(request, group_id):
             
             messages.success(request, "Post created successfully!")
             
-            # If HTMX request, return empty response (client will handle reload)
+            # If HTMX request, return empty response and trigger refresh
             if request.headers.get('HX-Request'):
-                return HttpResponse(status=200)
+                response = HttpResponse(status=200)
+                response['HX-Trigger'] = 'postCreated'
+                return response
             
             return redirect('home')
         else:
@@ -528,21 +527,31 @@ def group_detail_view(request, group_id):
     group = get_object_or_404(Group, pk=group_id)
     
     # Check if the user is a member of the group
-    if request.user.profile not in group.members.all():
+    membership = GroupMembership.objects.filter(group=group, member=request.user.profile).first()
+    if not membership:
          messages.error(request, "You must be a member to view this group.")
-         return redirect('group_list')
+         return redirect('home')
 
-    deceased = Deceased.objects.filter(group__is_active=True).order_by('-date')
-    # Use the reverse relationship to get the admin members
-    group_admins = group.members.filter(groupmembership__is_admin=True)
+    deceased = Deceased.objects.filter(group=group).annotate(
+        total_raised=Sum('member_deceased__amount')
+    ).order_by('-date')
+    
+    # Get all managers (admins and moderators)
+    group_managers = group.members.filter(
+        Q(groupmembership__is_admin=True) | 
+        Q(groupmembership__role__in=['admin', 'moderator'])
+    ).distinct()
+
+    is_manager = membership.is_admin or membership.role in ['admin', 'moderator'] or group.creator == request.user or group.admin == request.user.profile
 
     context = {
         'group': group,
-        'group_admins': group_admins,
-        'members': group.members.all(),  # All members of the group
+        'group_managers': group_managers,
+        'is_manager': is_manager,
+        'members': group.members.all(),
         'count_members': group.members.count(),
-        'count_admins': group_admins.count(),
-        'deceased':deceased,
+        'count_managers': group_managers.count(),
+        'deceased': deceased,
     }
 
     return render(request, 'chema/group_detail_view.html', context)
@@ -626,7 +635,7 @@ def update_member_attribute(request, group_id, member_id):
     
     # Verify permission
     current_membership = GroupMembership.objects.filter(group=group, member=request.user.profile).first()
-    is_admin = current_membership and (current_membership.is_admin or current_membership.role in ['admin', 'moderator'] or group.creator == request.user)
+    is_admin = current_membership and (current_membership.is_admin or current_membership.role in ['admin', 'moderator'] or group.creator == request.user or group.admin == request.user.profile)
     
     if not is_admin:
         return HttpResponse(status=403)
@@ -666,11 +675,27 @@ def group_discovery(request):
 
 @login_required
 def my_groups(request):
-    """Page showing the user's groups."""
+    """Page showing the user's groups with HTMX tab support."""
     user = request.user.profile
-    groups = user.groups.all()
-    active_group = groups.filter(is_active=True).first() or groups.first()
+    switch_id = request.GET.get('switch_id')
     
+    # Handle group switching via tabs
+    if switch_id:
+        membership = get_object_or_404(GroupMembership, member=user, group_id=switch_id)
+        membership.is_active = True
+        membership.save()
+        # Deactivate others for this user
+        GroupMembership.objects.filter(member=user).exclude(id=membership.id).update(is_active=False)
+
+    groups = user.groups.all()
+    # Find active group
+    active_membership = GroupMembership.objects.filter(member=user, is_active=True).first()
+    if not active_membership and groups.exists():
+        active_membership = GroupMembership.objects.filter(member=user).first()
+        active_membership.is_active = True
+        active_membership.save()
+        
+    active_group = active_membership.group if active_membership else None
     admins_as_members = active_group.get_admins() if active_group else []
     
     context = {
@@ -678,6 +703,10 @@ def my_groups(request):
         'active_group': active_group,
         'admins_as_members': admins_as_members,
     }
+
+    if request.headers.get('HX-Request'):
+        return render(request, 'chema/partials/my_groups_content.html', context)
+        
     return render(request, 'chema/my_groups.html', context)
 
 
@@ -691,21 +720,23 @@ def group_list(request):
     ).annotate(member_count=Count('members'))
     return render(request, 'chema/group_list.html', {'groups': groups})
 
+@login_required
 def toggle_group(request, group_id):
-    # Get the group being toggled
-    group_to_toggle = get_object_or_404(Group, id=group_id)
+    user = request.user.profile
+    # Get the membership being toggled
+    membership = get_object_or_404(GroupMembership, member=user, group_id=group_id)
     
-    # Toggle the group by setting it to active
-    group_to_toggle.is_active = True
-    group_to_toggle.save()
+    # Set this one to active
+    membership.is_active = True
+    membership.save()
 
-    # Deactivate all other groups
-    Group.objects.exclude(id=group_id).update(is_active=False)
+    # Deactivate all other memberships for THIS user
+    GroupMembership.objects.filter(member=user).exclude(id=membership.id).update(is_active=False)
 
     # If HTMX request, return the updated content instead of redirecting
     if request.headers.get('HX-Request'):
         # Fetch the updated data for the new active group
-        active_group = group_to_toggle
+        active_group = membership.group
         active_group_posts = Post.objects.filter(group=active_group).order_by('-created_at')
         active_group_comments = Comment.objects.filter(post__in=active_group_posts).order_by('-created_at')
         
@@ -721,19 +752,20 @@ def toggle_group(request, group_id):
             comment.replies.set(Reply.objects.filter(comment=comment).order_by('-created_at')[:3])
         
         context = {
-            'grouped_data': [group_data],
+            'group_data': group_data,
             'active_group': active_group,
             'active_group_posts': active_group_posts,
             'active_group_comments': active_group_comments,
-            'contributions': Contribution.objects.filter(deceased_member_id__contributions_open=True, group__is_active=True),
+            'contributions': Contribution.objects.filter(deceased_member_id__contributions_open=True, group=active_group),
             'admins_as_members': active_group.get_admins(),
-            'deceased': Deceased.objects.filter(group__is_active=True),
+            'deceased': Deceased.objects.filter(group=active_group),
         }
         
-        # Return just the home content
         return render(request, 'chema/home.html', context)
 
-    return redirect('home')
+    # If not HTMX, redirect back to where we came from, or home as fallback
+    referer = request.META.get('HTTP_REFERER')
+    return redirect(referer if referer else 'home')
 
 
 import csv
@@ -784,7 +816,7 @@ def group_members_table(request, group_id):
     current_membership = GroupMembership.objects.filter(group=group, member=request.user.profile).first()
     is_admin = False
     if current_membership:
-        is_admin = current_membership.is_admin or current_membership.role in ['admin', 'moderator'] or group.creator == request.user
+        is_admin = current_membership.is_admin or current_membership.role in ['admin', 'moderator'] or group.creator == request.user or group.admin == request.user.profile
     
     # Implement Pagination
     from django.core.paginator import Paginator

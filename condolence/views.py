@@ -14,20 +14,33 @@ def create_contribution(request):
     if request.method == 'POST':
         form = ContributionForm(request.POST)
         if form.is_valid():
-            current_group = Group.objects.get(is_active=True)
-            # group_admin = current_group.admin  # Unused variable
+            # Get user's active group membership
+            active_membership = GroupMembership.objects.filter(
+                member=request.user.profile,
+                is_active=True
+            ).first()
             
-            # Check if user is part of AdminGroup or is admin of the current group
-            # Simplifying permission check based on previous pattern
-            is_admin = False
-            try:
-                profile = request.user.profile
-                membership = GroupMembership.objects.get(group=current_group, member=profile)
-                is_admin = membership.is_admin or membership.role in ['admin', 'moderator']
-            except GroupMembership.DoesNotExist:
-                pass
+            if not active_membership:
+                # Fallback to first membership
+                active_membership = GroupMembership.objects.filter(member=request.user.profile).first()
+            
+            if not active_membership:
+                msg = "You are not a member of any group."
+                messages.error(request, msg)
+                if request.headers.get('HX-Request'):
+                    form.add_error(None, msg)
+                    return render(request, 'condolence/partials/contribution_form_content.html', {'form': form})
+                return redirect('home')
+            
+            current_group = active_membership.group
+            
+            # Consistent permission check
+            is_admin = (active_membership.is_admin or 
+                       active_membership.role in ['admin', 'moderator'] or
+                       current_group.creator == request.user or
+                       current_group.admin == request.user.profile)
 
-            if not is_admin and not request.user.groups.filter(name="Admin").exists():
+            if not is_admin:
                msg = "You are not an admin of this group."
                messages.error(request, msg)
                if request.headers.get('HX-Request'):
@@ -51,9 +64,9 @@ def create_contribution(request):
             messages.success(request, "Contribution recorded successfully.")
             
             if request.headers.get('HX-Request'):
-                # Return the detail partial to be swapped into the modal
-                response = render(request, 'condolence/partials/contribution_detail_partial.html', {'contribution': contribution})
-                response['HX-Trigger'] = 'contributionRecorded'
+                # Return a response that triggers page refresh
+                response = HttpResponse(status=200)
+                response['HX-Refresh'] = 'true'
                 return response
 
             return redirect('contribution_detail', contribution.id)
@@ -69,23 +82,53 @@ def create_contribution(request):
                 return render(request, 'condolence/partials/contribution_form_content.html', context)
 
     else:
+        # Get user's active group membership
+        active_membership = GroupMembership.objects.filter(
+            member=request.user.profile,
+            is_active=True
+        ).first()
+        
+        if not active_membership:
+            active_membership = GroupMembership.objects.filter(member=request.user.profile).first()
+        
+        if not active_membership:
+            messages.error(request, "You are not a member of any group.")
+            return redirect('home')
+        
+        active_group = active_membership.group
+        
+        # Get query parameters
         deceased_id = request.GET.get('deceased_id')
+        contributing_member_id = request.GET.get('contributing_member')
+        
         initial_data = {}
         deceased_name = None
+        contributing_member_name = None
+        
+        # Handle deceased member pre-selection (Scenario 2 & 3)
         if deceased_id:
             initial_data['deceased_member'] = deceased_id
             try:
-                # Assuming Deceased model has appropriate __str__ returning the name
                 deceased_name = str(Deceased.objects.get(id=deceased_id))
             except (Deceased.DoesNotExist, ValueError):
                 pass
+        
+        # Handle contributing member pre-selection (Scenario 3)
+        if contributing_member_id:
+            initial_data['contributing_member'] = contributing_member_id
+            try:
+                contributing_member_name = str(Profile.objects.get(id=contributing_member_id))
+            except (Profile.DoesNotExist, ValueError):
+                pass
             
-        form = ContributionForm(initial=initial_data)
+        form = ContributionForm(initial=initial_data, active_group=active_group)
         
     if request.headers.get('HX-Request'):
         context = {'form': form}
         if 'deceased_name' in locals() and deceased_name:
             context['deceased_name'] = deceased_name
+        if 'contributing_member_name' in locals() and contributing_member_name:
+            context['contributing_member_name'] = contributing_member_name
         return render(request, 'condolence/partials/contribution_form_content.html', context)
 
     return render(request, 'condolence/create_contribution.html', {'form': form})
@@ -113,9 +156,29 @@ def contribution_detail(request, contribution_id):
 
 
 
+@login_required
 def deceased(request):
-    active_group = Group.objects.filter(is_active=True).first()
-    group_admin = Profile.objects.filter(groupmembership__is_admin=True, groups=active_group)
+    # Get the active group for this user specifically
+    active_membership = GroupMembership.objects.filter(
+        member=request.user.profile, 
+        is_active=True
+    ).first()
+    
+    if not active_membership:
+        # Fallback to first membership if none are marked active
+        active_membership = GroupMembership.objects.filter(member=request.user.profile).first()
+        
+    if not active_membership:
+        messages.error(request, "You are not a member of any group.")
+        return redirect('home')
+        
+    active_group = active_membership.group
+    
+    # STRICT PERMISSION CHECK: Only admins and moderators
+    is_manager = active_membership.is_admin or active_membership.role in ['admin', 'moderator'] or active_group.creator == request.user or active_group.admin == request.user.profile
+    if not is_manager:
+        messages.error(request, "Only group admins and moderators can declare members deceased.")
+        return redirect('group_detail_view', active_group.id)
 
     if request.method == "POST":
         form = DeceasedForm(request.POST, active_group=active_group)
@@ -150,7 +213,9 @@ def deceased(request):
 
             # HTMX handling
             if request.headers.get('HX-Request'):
-                return HttpResponse(status=200)
+                response = HttpResponse(status=200)
+                response['HX-Refresh'] = 'true'
+                return response
 
             return redirect('group_detail_view', active_group.id)
 
@@ -186,12 +251,21 @@ def toggle_deceased(request, deceased_id):
 
 
 
+@login_required
 def stop_contributions(request, deceased_id):
     # Get the Deceased instance
-    deceased = get_object_or_404(Deceased, pk=deceased_id)
+    deceased_obj = get_object_or_404(Deceased, pk=deceased_id)
+    group = deceased_obj.group
+    
+    # STRICT PERMISSION CHECK: Check user's role in this specific group
+    membership = GroupMembership.objects.filter(group=group, member=request.user.profile).first()
+    is_manager = membership and (membership.is_admin or membership.role in ['admin', 'moderator'] or group.creator == request.user or group.admin == request.user.profile)
+    
+    if not is_manager:
+        return HttpResponse("You do not have permission to perform this action.", status=403)
 
     # Call the method to stop contributions
-    deceased.stop_contributions()
+    deceased_obj.stop_contributions()
 
     # Return a JSON response indicating success
     return HttpResponse('<h1>Contributions for This Deceased Member Closed</h2>')
@@ -213,7 +287,10 @@ def filter_contributions(request, deceased_id=None):
 
     # Detailed Mode Logic (When deceased is selected and mode is requested)
     if mode == 'detailed' and deceased_id and deceased_id != 'all':
-        active_group = Group.objects.filter(is_active=True).first() # Should get this more robustly ideally
+        # Get the deceased object to show who this list is for
+        deceased_obj = get_object_or_404(Deceased, id=deceased_id)
+        
+        active_group = deceased_obj.group  # Use the deceased's group instead
         # Get all members of the active group
         all_members = Profile.objects.filter(groups=active_group)
         
@@ -236,11 +313,13 @@ def filter_contributions(request, deceased_id=None):
                 'member': member,
                 'is_paid': is_paid,
                 'amount': contribution.amount if contribution else 0,
-                'date': contribution.contribution_date if contribution else None
+                'date': contribution.contribution_date if contribution else None,
+                'contribution_id': contribution.id if contribution else None
             })
             
         context = {
             'members_data': members_data,
+            'deceased': deceased_obj,  # Add the deceased object
             'deceased_id': deceased_id,
             'filter_status': status_filter,
             'total_amount': total_amount # For OOB

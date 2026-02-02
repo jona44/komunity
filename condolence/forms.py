@@ -6,7 +6,7 @@ from chema.models import *
 class ContributionForm(forms.ModelForm):
     class Meta:
         model = Contribution
-        fields = ['contributing_member', 'amount', 'deceased_member']
+        fields = ['contributing_member', 'amount', 'deceased_member', 'payment_method']
         widgets = {
             'contributing_member': forms.Select(attrs={
                 'class': 'select select-bordered w-full bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500'
@@ -19,14 +19,33 @@ class ContributionForm(forms.ModelForm):
                 'step': '0.01',
                 'placeholder': '100.00'
             }),
+            'payment_method': forms.Select(attrs={
+                'class': 'select select-bordered w-full bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500'
+            }),
         }
 
     def __init__(self, *args, **kwargs):
+        # Pop custom kwargs before calling super
+        active_group = kwargs.pop('active_group', None)
+        
         super(ContributionForm, self).__init__(*args, **kwargs)
-        # Filter the choices for deceased members to only include those marked as deceased and active
-        self.fields['deceased_member'].queryset = Deceased.objects.filter(group__is_active=True, cont_is_active=True)
-        # Filter the choices for contributing members to those in active groups
-        self.fields['contributing_member'].queryset = Profile.objects.filter(groups__is_active=True)
+        
+        # If no active group provided, try to get one
+        if not active_group:
+            active_group = Group.objects.filter(is_active=True).first()
+        
+        if active_group:
+            # Filter deceased members to only those in the active group with open contributions
+            self.fields['deceased_member'].queryset = Deceased.objects.filter(
+                group=active_group, 
+                cont_is_active=True
+            )
+            # Filter contributing members to active group members only
+            self.fields['contributing_member'].queryset = active_group.members.all()
+        else:
+            # Fallback: no members available
+            self.fields['deceased_member'].queryset = Deceased.objects.none()
+            self.fields['contributing_member'].queryset = Profile.objects.none()
         
         # If deceased_member is passed in initial, we might want to hide it or make it readonly
         if 'deceased_member' in kwargs.get('initial', {}):
@@ -49,6 +68,10 @@ class ContributionForm(forms.ModelForm):
             self.fields['contributing_member'].queryset = self.fields['contributing_member'].queryset.exclude(
                 id__in=existing_contributor_ids
             )
+        
+        # If contributing_member is also passed in initial (Scenario 3), hide it too
+        if 'contributing_member' in kwargs.get('initial', {}):
+            self.fields['contributing_member'].widget = forms.HiddenInput()
 
 
 
@@ -61,8 +84,11 @@ class DeceasedForm(forms.ModelForm):
         active_group = kwargs.pop('active_group', None)
         super(DeceasedForm, self).__init__(*args, **kwargs)
         
-        # Filter to show only members of the active group
+        # Filter to show only members of the active group who are not already marked as deceased
         if active_group:
-            self.fields['deceased'].queryset = active_group.members.all()
+            self.fields['deceased'].queryset = active_group.members.filter(
+                groupmembership__is_deceased=False,
+                profile_deceased__isnull=True
+            ).distinct()
         else:
             self.fields['deceased'].queryset = Profile.objects.none()

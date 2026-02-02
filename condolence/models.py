@@ -12,6 +12,12 @@ class Contribution(models.Model):
     contributing_member = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name='deceased_contributions', null=True, blank=True)
     group_admin = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name='admin_contributions', null=True, blank=True)
     amount      = models.DecimalField(default=100.00, max_digits=10, decimal_places=2)
+    payment_method = models.CharField(max_length=50, default='cash', choices=[
+        ('cash', 'Cash'),
+        ('bank_transfer', 'Bank Transfer'),
+        ('mobile_money', 'Mobile Money'),
+        ('other', 'Other'),
+    ])
     contribution_date = models.DateField(auto_now_add=True)
     
     def __str__(self):

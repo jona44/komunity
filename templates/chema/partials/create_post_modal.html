@@ -18,7 +18,8 @@
           hx-target="#create_post_modal"
           hx-swap="outerHTML"
           hx-encoding="multipart/form-data"
-          hx-on::after-request="if(event.detail.successful) { document.getElementById('create_post_modal').close(); window.location.reload(); }">
+          hx-on::after-request="if(event.detail.successful) { document.getElementById('create_post_modal').close(); }">
+
       {% csrf_token %}
       
       <!-- Content Field -->
@@ -185,10 +186,11 @@
         document.getElementById('media-preview').classList.add('hidden');
         document.getElementById('images-container').innerHTML = '';
         document.getElementById('video-container').classList.add('hidden');
-        document.getElementById('preview-video').src = '';
       }
     </script>
-  </div>4
+  </div>
+
+
   
   <!-- Modal Backdrop -->
   <form method="dialog" class="modal-backdrop">
