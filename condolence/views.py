@@ -272,21 +272,31 @@ def filter_contributions(request, deceased_id=None):
     mode = request.GET.get('mode')
     status_filter = request.GET.get('status', 'all')
     
+    # Get active group context
+    active_membership = GroupMembership.objects.filter(member=request.user.profile, is_active=True).first()
+    if not active_membership:
+        active_membership = GroupMembership.objects.filter(member=request.user.profile).first()
+    
+    if not active_membership:
+        return HttpResponse("No active group found", status=403)
+    
+    active_group = active_membership.group
+
     # Common: Calculate Total Amount (Always needed for OOB)
     if deceased_id and deceased_id != 'all':
-        base_contributions = Contribution.objects.filter(deceased_member_id=deceased_id)
+        # Ensure the deceased belongs to the active group!
+        base_contributions = Contribution.objects.filter(deceased_member_id=deceased_id, group=active_group)
     else:
         base_contributions = Contribution.objects.filter(
-            deceased_member__group__is_active=True
+            group=active_group
         )
     total_amount = base_contributions.aggregate(Sum('amount'))['amount__sum'] or 0
 
     # Detailed Mode Logic (When deceased is selected and mode is requested)
     if mode == 'detailed' and deceased_id and deceased_id != 'all':
         # Get the deceased object to show who this list is for
-        deceased_obj = get_object_or_404(Deceased, id=deceased_id)
+        deceased_obj = get_object_or_404(Deceased, id=deceased_id, group=active_group)
         
-        active_group = deceased_obj.group  # Use the deceased's group instead
         # Get all members of the active group
         all_members = Profile.objects.filter(groups=active_group)
         
@@ -313,12 +323,18 @@ def filter_contributions(request, deceased_id=None):
                 'contribution_id': contribution.id if contribution else None
             })
             
+        is_admin = (active_membership.is_admin or 
+                   active_membership.role in ['admin', 'moderator'] or
+                   active_group.creator == request.user or
+                   active_group.admin == request.user.profile)
+                   
         context = {
             'members_data': members_data,
             'deceased': deceased_obj,  # Add the deceased object
             'deceased_id': deceased_id,
             'filter_status': status_filter,
-            'total_amount': total_amount # For OOB
+            'total_amount': total_amount, # For OOB
+            'is_admin': is_admin
         }
         return render(request, 'condolence/partials/member_status_list.html', context)
 
@@ -326,7 +342,7 @@ def filter_contributions(request, deceased_id=None):
     deceased_obj = None
     if deceased_id and deceased_id != 'all':
         contributions = base_contributions.order_by('-contribution_date')
-        deceased_obj = Deceased.objects.filter(id=deceased_id).first()
+        deceased_obj = Deceased.objects.filter(id=deceased_id, group=active_group).first()
     else:
         contributions = base_contributions.order_by('-contribution_date')
         
@@ -343,7 +359,17 @@ def filter_contributions(request, deceased_id=None):
 def search_contributions(request):
     query = request.GET.get('q', '')
     
-    if query:
+    # Get active group context
+    active_membership = GroupMembership.objects.filter(member=request.user.profile, is_active=True).first()
+    if not active_membership:
+        active_membership = GroupMembership.objects.filter(member=request.user.profile).first()
+        
+    if not active_membership:
+        active_group = None
+    else:
+        active_group = active_membership.group
+
+    if query and active_group:
         contributions = Contribution.objects.filter(
             Q(contributing_member__first_name__icontains=query) |
             Q(contributing_member__last_name__icontains=query) |
@@ -351,7 +377,7 @@ def search_contributions(request):
             Q(deceased_member__deceased__last_name__icontains=query) |
             Q(amount__icontains=query) 
         ).filter(
-            deceased_member__group__is_active=True
+            group=active_group
         ).distinct().order_by('-contribution_date')
     else:
         contributions = Contribution.objects.none()
@@ -371,7 +397,22 @@ def search_contributions(request):
 @login_required
 def contributions_list(request):
     """Page showing the list of contributions."""
-    active_group = Group.objects.filter(is_active=True).first()
+    # Get user's active group membership
+    active_membership = GroupMembership.objects.filter(
+        member=request.user.profile,
+        is_active=True
+    ).first()
+    
+    if not active_membership:
+        # Fallback to first membership
+        active_membership = GroupMembership.objects.filter(member=request.user.profile).first()
+    
+    if not active_membership:
+        messages.error(request, "You are not a member of any group.")
+        return redirect('home')
+    
+    active_group = active_membership.group
+
     deceased_list = Deceased.objects.filter(group=active_group).annotate(
         total_raised=Sum('member_deceased__amount')
     )
@@ -381,7 +422,7 @@ def contributions_list(request):
     latest_deceased = deceased_list.last() # taking last created if id is sequential, or order by date if needed
     
     if latest_deceased:
-        contributions = Contribution.objects.filter(deceased_member=latest_deceased).order_by('-contribution_date')
+        contributions = Contribution.objects.filter(deceased_member=latest_deceased, group=active_group).order_by('-contribution_date')
         selected_deceased_id = latest_deceased.id
         total_contributions = latest_deceased.total_raised # Use the annotated value
     else:
@@ -389,6 +430,11 @@ def contributions_list(request):
         selected_deceased_id = None
         total_contributions = 0
     
+    is_admin = (active_membership.is_admin or 
+               active_membership.role in ['admin', 'moderator'] or
+               active_group.creator == request.user or
+               active_group.admin == request.user.profile)
+
     context = {
         'active_group': active_group,
         'deceased': deceased_list,
@@ -397,6 +443,7 @@ def contributions_list(request):
         'selected_deceased_id': selected_deceased_id,
         'deceased_id': selected_deceased_id, # Also pass as deceased_id for consistency with partials
         'deceased_member': latest_deceased,
-        'show_detail_toggle': True if selected_deceased_id else False
+        'show_detail_toggle': True if selected_deceased_id else False,
+        'is_admin': is_admin
     }
     return render(request, 'condolence/contributions_page.html', context)

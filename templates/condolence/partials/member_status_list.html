@@ -73,7 +73,7 @@
                 </div>
             </div>
 
-            {% if not item.is_paid and deceased_id %}
+            {% if not item.is_paid and deceased_id and is_admin %}
             <button class="btn btn-xs btn-circle btn-ghost text-green-600 hover:bg-green-50"
                     hx-get="{% url 'create_contribution' %}?deceased_id={{ deceased_id }}&contributing_member={{ item.member.id }}"
                     hx-target="#contribution_form_container"
