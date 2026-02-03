@@ -1,44 +1,69 @@
-<ul class="space-y-3" id="contributions-list">
+<div id="contributions-list-content">
+    {% if deceased_member %}
+    <div class="mb-4">
+        <h3 class="text-xl font-black text-gray-900 tracking-tight">Contributions for {{ deceased_member.deceased.first_name }} {{ deceased_member.deceased.last_name }}</h3>
+    </div>
+    {% endif %}
     {% if show_detail_toggle %}
     <div class="flex justify-end mb-4">
-        <button class="text-sm font-bold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-4 py-2 rounded-full transition-colors duration-200 flex items-center gap-2 shadow-sm"
+        <button class="text-xs font-bold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors duration-200 flex items-center gap-2"
                 hx-get="{% url 'filter_contributions' deceased_id %}?mode=detailed"
                 hx-target="#contributions-list-container">
             <span>View Member Status</span>
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
         </button>
     </div>
     {% endif %}
-    {% for contribution in contributions %}
-    <li class="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all duration-200">
-        <div class="flex items-start gap-3">
-            <!-- Avatar -->
-            
-            
-            <!-- Content -->
-            <div class="flex-1 min-w-0">
-                <div class="flex items-start justify-between gap-2 mb-1">
-                    <a href="{% url 'contribution_detail' contribution.id %}" 
-                       class="group font-semibold text-gray-900 hover:text-blue-600 transition-colors duration-200 flex items-center gap-1"
-                       hx-get="{% url 'contribution_detail' contribution.id %}"
-                       hx-target="#contribution_detail_modal"
-                       onclick="contribution_detail_modal.showModal(); event.preventDefault()">
+
+    <!-- List Header -->
+    <div class="grid grid-cols-12 gap-4 px-4 py-3 border-b border-gray-100 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+        <div class="col-span-6">Contributor</div>
+        <div class="col-span-3 text-right">Date</div>
+        <div class="col-span-3 text-right">Amount</div>
+    </div>
+
+    <!-- List Items -->
+    <ul class="space-y-2 mt-2" id="contributions-list">
+        {% for contribution in contributions %}
+        <li class="group bg-white hover:bg-gray-50 rounded-xl transition-colors duration-200 border border-transparent hover:border-gray-100">
+            <!-- Whole row clickable for detail -->
+            <a href="{% url 'contribution_detail' contribution.id %}" 
+               class="grid grid-cols-12 gap-4 items-center p-3"
+               hx-get="{% url 'contribution_detail' contribution.id %}"
+               hx-target="#contribution_detail_modal"
+               onclick="contribution_detail_modal.showModal(); event.preventDefault()">
+                
+                <!-- Contributor -->
+                <div class="col-span-6 flex items-center gap-3 min-w-0">
+                    <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs flex-shrink-0">
+                        {{ contribution.contributing_member.first_name|slice:":1" }}{{ contribution.contributing_member.last_name|slice:":1" }}
+                    </div>
+                    <span class="font-semibold text-gray-900 truncate text-sm group-hover:text-blue-600 transition-colors">
                         {{ contribution.contributing_member }}
-                        <svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                    </a>
-                    <span class="text-xs text-gray-500 whitespace-nowrap">{{ contribution.contribution_date }}</span>
+                    </span>
                 </div>
+
+                <!-- Date -->
+                <div class="col-span-3 text-right text-xs text-gray-500">
+                    {{ contribution.contribution_date|date:"M d" }}
+                </div>
+
+                <!-- Amount -->
+                <div class="col-span-3 text-right font-bold text-gray-900 text-sm">
+                    R {{ contribution.amount }}
+                </div>
+            </a>
+        </li>
+        {% empty %}
+        <li class="p-12 text-center">
+            <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gray-50 mb-3">
+                <svg class="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/></svg>
             </div>
-        </div>
-    </li>
-    {% empty %}
-    <li class="p-8 text-center text-gray-500 bg-gray-50 rounded-lg border border-gray-200 border-dashed">
-        <p>No contributions found.</p>
-    </li>
-    {% endfor %}
-</ul>
+            <p class="text-gray-500 text-sm">No contributions recorded yet.</p>
+        </li>
+        {% endfor %}
+    </ul>
+</div>
 
 {% if request.headers.HX_Request %}
 <span id="contribution-total-count" hx-swap-oob="true" class="px-3 py-1 bg-white text-blue-600 rounded-full text-sm font-semibold">{{ contributions.count }}</span>
