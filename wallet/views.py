@@ -66,7 +66,7 @@ def top_up_with_voucher(request):
         # 4. Return success signal to HTMX
         # The 'HX-Trigger' header tells the frontend to update the balance component
         import json
-        triggers = {'update-balance': True, 'close-top-up-modal': True}
+        triggers = {'update-balance': True, 'close-top-up-modal': True, 'update-history': True}
         return HttpResponse("", status=200, headers={'HX-Trigger': json.dumps(triggers)})
     else:
         # 3. Mark Failed
@@ -140,7 +140,8 @@ def transfer_to_group(request, group_id):
         triggers = {
             'update-balance': True, 
             'close-transfer-modal': True,
-            'update-contributions': True
+            'update-contributions': True,
+            'update-history': True
         }
         return HttpResponse("", status=200, headers={'HX-Trigger': json.dumps(triggers)})
     else:
@@ -157,22 +158,58 @@ def get_wallet_balance_snippet(request):
     # Ensure wallet exists
     user_wallet, created = Wallet.objects.get_or_create(user=request.user, defaults={'external_wallet_id': f"auto_{request.user.email}"})
     
-    # In a real app, query the API.
-    # For now, let's sum up COMPLETED top-ups minus COMPLETED transfers from our local DB
-    # to make the "mock" feel real.
-    
-    top_ups = Transaction.objects.filter(
-        wallet=user_wallet, 
-        transaction_type=Transaction.TransactionType.TOP_UP, 
-        status=Transaction.TransactionStatus.COMPLETED
-    ).aggregate(total=models.Sum('amount'))['total'] or Decimal('0.00')
-    
-    transfers = Transaction.objects.filter(
-        wallet=user_wallet, 
-        transaction_type=Transaction.TransactionType.TRANSFER, 
-        status=Transaction.TransactionStatus.COMPLETED
-    ).aggregate(total=models.Sum('amount'))['total'] or Decimal('0.00')
-    
-    balance = top_ups - transfers
+    balance = user_wallet.get_balance()
     
     return HttpResponse(f"R {balance}")
+
+@login_required
+def transaction_history(request):
+    """
+    View to display the user's transaction history.
+    """
+    user_wallet, created = Wallet.objects.get_or_create(user=request.user, defaults={'external_wallet_id': f"auto_{request.user.email}"})
+    transactions = Transaction.objects.filter(wallet=user_wallet).order_by('-timestamp')
+    
+    context = {
+        'transactions': transactions,
+        'wallet': user_wallet,
+        'balance': user_wallet.get_balance(),
+    }
+    
+    if request.headers.get('HX-Request') and not request.headers.get('HX-Target') == 'main-content':
+        # If it's a targeted HTMX request (like update-history), return just the list
+        return render(request, 'wallet/partials/transaction_list.html', context)
+        
+    return render(request, 'wallet/history.html', context)
+
+@login_required
+def group_transaction_history(request, group_id):
+    """
+    View to display the transaction history for a specific group.
+    """
+    group = get_object_or_404(Group, pk=group_id)
+    
+    # Permission: Any member of the group can view for transparency
+    if not group.is_member(request.user):
+        return HttpResponse("Unauthorized", status=403)
+    
+    # All transactions where this group is the destination
+    transactions = Transaction.objects.filter(destination_group=group).order_by('-timestamp')
+    
+    # Calculate group balance (Sum of transfers - Sum of payouts)
+    from django.db.models import Sum
+    incoming = transactions.filter(transaction_type='TRANSFER', status='COMPLETED').aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+    outgoing = transactions.filter(transaction_type='PAYOUT_RECEIVED', status='COMPLETED').aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+    balance = incoming - outgoing
+    
+    context = {
+        'group': group,
+        'transactions': transactions,
+        'balance': balance,
+        'is_admin': group.is_admin(request.user)
+    }
+    
+    if request.headers.get('HX-Request') and not request.headers.get('HX-Target') == 'main-content':
+        return render(request, 'wallet/partials/group_transaction_list.html', context)
+        
+    return render(request, 'wallet/group_history.html', context)

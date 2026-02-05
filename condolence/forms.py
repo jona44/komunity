@@ -92,3 +92,26 @@ class DeceasedForm(forms.ModelForm):
             ).distinct()
         else:
             self.fields['deceased'].queryset = Profile.objects.none()
+
+
+class BeneficiaryForm(forms.ModelForm):
+    class Meta:
+        model = Deceased
+        fields = ['beneficiary']
+        widgets = {
+            'beneficiary': forms.Select(attrs={
+                'class': 'select select-bordered w-full bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500'
+            }),
+        }
+
+    def __init__(self, *args, **kwargs):
+        active_group = kwargs.pop('active_group', None)
+        super(BeneficiaryForm, self).__init__(*args, **kwargs)
+        
+        if active_group:
+            self.fields['beneficiary'].queryset = active_group.members.all()
+        else:
+            self.fields['beneficiary'].queryset = Profile.objects.none()
+        
+        self.fields['beneficiary'].label = "Select Beneficiary"
+        self.fields['beneficiary'].empty_label = "Select a beneficiary..."

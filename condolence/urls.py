@@ -11,5 +11,7 @@ urlpatterns = [
     path('stop_contributions/<int:deceased_id>/', views.stop_contributions, name='stop_contributions'),
     path('filter-contributions/<str:deceased_id>/', views.filter_contributions, name='filter_contributions'),
     path('search-contributions/', views.search_contributions, name='search_contributions'),
+    path('manage-beneficiary/<int:deceased_id>/', views.manage_beneficiary, name='manage_beneficiary'),
+    path('disburse-funds/<int:deceased_id>/', views.disburse_funds, name='disburse_funds'),
 ]
 

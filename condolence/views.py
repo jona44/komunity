@@ -6,58 +6,72 @@ from .models import *
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from chema.models import *
+from wallet.models import Wallet, Transaction
+from decimal import Decimal
 
 
 
 
+@login_required
 def create_contribution(request):
-    if request.method == 'POST':
-        form = ContributionForm(request.POST)
-        if form.is_valid():
-            # Get user's active group membership
-            active_membership = GroupMembership.objects.filter(
-                member=request.user.profile,
-                is_active=True
-            ).first()
-            
-            if not active_membership:
-                # Fallback to first membership
-                active_membership = GroupMembership.objects.filter(member=request.user.profile).first()
-            
-            if not active_membership:
-                msg = "You are not a member of any group."
-                messages.error(request, msg)
-                if request.headers.get('HX-Request'):
-                    form.add_error(None, msg)
-                    return render(request, 'condolence/partials/contribution_form_content.html', {'form': form})
-                return redirect('home')
-            
-            current_group = active_membership.group
-            
-            # Consistent permission check
-            is_admin = (active_membership.is_admin or 
-                       active_membership.role in ['admin', 'moderator'] or
-                       current_group.creator == request.user or
-                       current_group.admin == request.user.profile)
+    # Common: Get User's Active Group Context & Role
+    active_membership = GroupMembership.objects.filter(member=request.user.profile, is_active=True).first()
+    if not active_membership:
+        active_membership = GroupMembership.objects.filter(member=request.user.profile).first()
+    
+    if not active_membership:
+        msg = "You are not a member of any group."
+        messages.error(request, msg)
+        return redirect('home')
 
-            if not is_admin:
-               msg = "You are not an admin of this group."
-               messages.error(request, msg)
-               if request.headers.get('HX-Request'):
-                   form.add_error(None, msg)
-                   return render(request, 'condolence/partials/contribution_form_content.html', {'form': form})
-               return redirect('home')
-            
+    active_group = active_membership.group
+    
+    # Determine Permissions
+    is_admin = (active_membership.is_admin or 
+               active_membership.role in ['admin', 'moderator'] or
+               active_group.creator == request.user or
+               active_group.admin == request.user.profile)
+
+    # Check for Explicit Mode
+    mode = request.GET.get('mode', 'auto')
+
+    # --- Scenario 1: Wallet Payment Flow (Regular User OR Admin Personal Payment) ---
+    # Show if NOT admin, OR if admin specifically requested 'personal' mode
+    if not is_admin or (is_admin and mode == 'personal'):
+        if request.method == 'POST':
+            # Regular users (and personal admin payments) should use the wallet API endpoints
+            return HttpResponse("Invalid operation. Please use the payment form.", status=403)
+        
+        # Display Wallet Payment Form
+        deceased_id = request.GET.get('deceased_id')
+        deceased_name = ""
+        if deceased_id:
+             try: deceased_name = str(Deceased.objects.get(id=deceased_id))
+             except (Deceased.DoesNotExist, ValueError): pass
+             
+        context = {
+            'active_group': active_group,
+            'deceased_id': deceased_id,
+            'deceased_name': deceased_name,
+        }
+        return render(request, 'condolence/partials/wallet_payment_form.html', context)
+
+    # --- Scenario 2: Admin (Manual Record Flow) ---
+    if request.method == 'POST':
+        form = ContributionForm(request.POST, active_group=active_group)
+        if form.is_valid():
             amount = form.cleaned_data['amount']
             deceased_member = form.cleaned_data['deceased_member']
             contributing_member = form.cleaned_data['contributing_member']
+            # payment_method is handled by form save, default is fine or selected
             
             contribution = Contribution(
-                group=current_group,
+                group=active_group,
                 amount=amount,
                 contributing_member=contributing_member,
                 group_admin=request.user.profile,
-                deceased_member=deceased_member
+                deceased_member=deceased_member,
+                payment_method=form.cleaned_data.get('payment_method', 'cash')
             )
             contribution.save()
             
@@ -82,22 +96,7 @@ def create_contribution(request):
                 return render(request, 'condolence/partials/contribution_form_content.html', context)
 
     else:
-        # Get user's active group membership
-        active_membership = GroupMembership.objects.filter(
-            member=request.user.profile,
-            is_active=True
-        ).first()
-        
-        if not active_membership:
-            active_membership = GroupMembership.objects.filter(member=request.user.profile).first()
-        
-        if not active_membership:
-            messages.error(request, "You are not a member of any group.")
-            return redirect('home')
-        
-        active_group = active_membership.group
-        
-        # Get query parameters
+        # GET: Show Manual Form
         deceased_id = request.GET.get('deceased_id')
         contributing_member_id = request.GET.get('contributing_member')
         
@@ -105,21 +104,17 @@ def create_contribution(request):
         deceased_name = None
         contributing_member_name = None
         
-        # Handle deceased member pre-selection (Scenario 2 & 3)
+        # Handle deceased member pre-selection
         if deceased_id:
             initial_data['deceased_member'] = deceased_id
-            try:
-                deceased_name = str(Deceased.objects.get(id=deceased_id))
-            except (Deceased.DoesNotExist, ValueError):
-                pass
+            try: deceased_name = str(Deceased.objects.get(id=deceased_id))
+            except: pass
         
-        # Handle contributing member pre-selection (Scenario 3)
+        # Handle contributing member pre-selection
         if contributing_member_id:
             initial_data['contributing_member'] = contributing_member_id
-            try:
-                contributing_member_name = str(Profile.objects.get(id=contributing_member_id))
-            except (Profile.DoesNotExist, ValueError):
-                pass
+            try: contributing_member_name = str(Profile.objects.get(id=contributing_member_id))
+            except: pass
             
         form = ContributionForm(initial=initial_data, active_group=active_group)
         
@@ -323,10 +318,7 @@ def filter_contributions(request, deceased_id=None):
                 'contribution_id': contribution.id if contribution else None
             })
             
-        is_admin = (active_membership.is_admin or 
-                   active_membership.role in ['admin', 'moderator'] or
-                   active_group.creator == request.user or
-                   active_group.admin == request.user.profile)
+        is_admin = active_group.is_admin(request.user)
                    
         context = {
             'members_data': members_data,
@@ -351,7 +343,8 @@ def filter_contributions(request, deceased_id=None):
         'total_amount': total_amount,
         'deceased_id': deceased_id,
         'deceased_member': deceased_obj,
-        'show_detail_toggle': bool(deceased_id and deceased_id != 'all') # Flag to show button
+        'show_detail_toggle': bool(deceased_id and deceased_id != 'all'), # Flag to show button
+        'is_admin': active_group.is_admin(request.user)
     }
     return render(request, 'condolence/partials/contributions_list.html', context)
 
@@ -383,12 +376,14 @@ def search_contributions(request):
         contributions = Contribution.objects.none()
 
     total_amount = contributions.aggregate(Sum('amount'))['amount__sum'] or 0
+    is_admin = active_group.is_admin(request.user) if active_group else False
     
     context = {
         'contributions': contributions,
         'total_amount': total_amount,
         'is_search': True,
         'query': query,
+        'is_admin': is_admin,
     }
     
     return render(request, 'condolence/partials/contributions_list.html', context)
@@ -413,7 +408,7 @@ def contributions_list(request):
     
     active_group = active_membership.group
 
-    deceased_list = Deceased.objects.filter(group=active_group).annotate(
+    deceased_list = Deceased.objects.filter(group=active_group, contributions_open=True).annotate(
         total_raised=Sum('member_deceased__amount')
     )
     
@@ -430,10 +425,7 @@ def contributions_list(request):
         selected_deceased_id = None
         total_contributions = 0
     
-    is_admin = (active_membership.is_admin or 
-               active_membership.role in ['admin', 'moderator'] or
-               active_group.creator == request.user or
-               active_group.admin == request.user.profile)
+    is_admin = active_group.is_admin(request.user)
 
     context = {
         'active_group': active_group,
@@ -447,3 +439,112 @@ def contributions_list(request):
         'is_admin': is_admin
     }
     return render(request, 'condolence/contributions_page.html', context)
+
+
+@login_required
+def manage_beneficiary(request, deceased_id):
+    """View to select/update beneficiary for a deceased member"""
+    deceased_obj = get_object_or_404(Deceased, pk=deceased_id)
+    active_group = deceased_obj.group
+    
+    # Permission Check
+    is_admin = active_group.is_admin(request.user)
+    
+    if not is_admin:
+        return HttpResponse("Unauthorized", status=403)
+
+    if request.method == 'POST':
+        form = BeneficiaryForm(request.POST, instance=deceased_obj, active_group=active_group)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Beneficiary updated successfully.")
+            
+            # HTMX: Close modal and refresh specific parts (or whole page for simplicity)
+            if request.headers.get('HX-Request'):
+                 response = HttpResponse(status=204)
+                 response['HX-Refresh'] = 'true'
+                 return response
+                 
+            return redirect('contributions_list')
+    else:
+        form = BeneficiaryForm(instance=deceased_obj, active_group=active_group)
+    
+    context = {
+        'form': form,
+        'deceased': deceased_obj
+    }
+    return render(request, 'condolence/partials/beneficiary_modal.html', context)
+
+
+@login_required
+def disburse_funds(request, deceased_id):
+    """View to transfer funds to the beneficiary"""
+    deceased_obj = get_object_or_404(Deceased, pk=deceased_id)
+    
+    # Permission Check
+    active_group = deceased_obj.group
+    is_admin = active_group.is_admin(request.user)
+    
+    if not is_admin:
+        return HttpResponse("Unauthorized", status=403)
+        
+    if not deceased_obj.beneficiary:
+        return HttpResponse("Beneficiary not set", status=400)
+        
+    # if deceased_obj.funds_disbursed:
+    #    return HttpResponse("Funds already disbursed", status=400)
+        
+    if request.method == 'GET':
+        context = {
+            'deceased': deceased_obj
+        }
+        return render(request, 'condolence/partials/disburse_funds_modal.html', context)
+
+    # POST Handling
+    try:
+        amount_to_disburse = Decimal(request.POST.get('amount', '0'))
+    except:
+        return HttpResponse("Invalid amount", status=400)
+
+    available_balance = deceased_obj.get_balance()
+    
+    if amount_to_disburse <= 0:
+        messages.error(request, "Amount must be positive.")
+        # Re-render modal with error? For now simple response or redirect
+        if request.headers.get('HX-Request'):
+             response = HttpResponse(status=204) # Close modal
+             response['HX-Refresh'] = 'true'
+             return response
+        return redirect('contributions_list')
+
+    if amount_to_disburse > available_balance:
+        return HttpResponse("Insufficient funds", status=400)
+
+    # Create Transaction for Beneficiary (PAYOUT_RECEIVED)
+    beneficiary_wallet, _ = Wallet.objects.get_or_create(
+        user=deceased_obj.beneficiary.user, 
+        defaults={'external_wallet_id': f"auto_{deceased_obj.beneficiary.user.email}"}
+    )
+    
+    Transaction.objects.create(
+        wallet=beneficiary_wallet,
+        transaction_type='PAYOUT_RECEIVED',
+        amount=amount_to_disburse,
+        status='COMPLETED',
+        destination_group=active_group,
+        deceased_contribution=deceased_obj
+    )
+    
+    deceased_obj.funds_disbursed = True 
+    # deceased_obj.stop_contributions() 
+    deceased_obj.save()
+    
+    new_balance = beneficiary_wallet.get_balance()
+    messages.success(request, f"Successfully disbursed R {amount_to_disburse} to {deceased_obj.beneficiary}. New Wallet Balance: R {new_balance}")
+    
+    if request.headers.get('HX-Request'):
+         response = HttpResponse(status=204) # Close modal
+         response['HX-Refresh'] = 'true'
+         return response
+
+    return redirect('contributions_list')

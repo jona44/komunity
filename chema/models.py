@@ -41,7 +41,22 @@ class Group(models.Model):
         return reverse('create_post', args=[str(self.id)])
 
     def is_admin(self, user):
-        return user == self.creator or user in self.admins.all()
+        if not user.is_authenticated:
+            return False
+        if user.is_superuser:
+            return True
+        # Creator check
+        if user == self.creator:
+            return True
+        # Admins M2M check
+        if user in self.admins.all():
+            return True
+        # Membership role check
+        return self.groupmembership_set.filter(
+            member__user=user, 
+            role__in=['admin', 'moderator'],
+            is_active=True
+        ).exists()
 
     def is_member(self, user):
         return self.members.filter(id=user.profile.id, groupmembership__is_active=True).exists()

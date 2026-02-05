@@ -32,7 +32,11 @@
     </div>
 
     <!-- User Menu & Mobile Toggle -->
-    <div class="flex items-center md:order-2 space-x-3 md:space-x-0 rtl:space-x-reverse relative">
+    <div class="flex items-center md:order-2 space-x-3 md:space-x-4 rtl:space-x-reverse relative">
+
+        {% if user.is_authenticated %}
+            {% include "wallet/balance_snippet.html" %}
+        {% endif %}
         
         <!-- User Profile Button -->
         <button type="button" 
@@ -69,6 +73,12 @@
             <span class="block text-sm text-gray-500 truncate">{{ user.email }}</span>
           </div>
           <ul class="py-2" aria-labelledby="user-menu-button">
+            <li>
+              <a href="{% url 'wallet_history' %}" class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 italic">
+                <span class="material-icons text-sm">history</span>
+                Transaction History
+              </a>
+            </li>
             <li>
               <a href="{% url 'profile' %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">My Profile</a>
             </li>

@@ -13,6 +13,7 @@ urlpatterns = [
     path('', include('chema.urls')),
     path('', include('user.urls')),
     path('', include('condolence.urls')),
+    path('', include('wallet.urls')),
     
    
 ]

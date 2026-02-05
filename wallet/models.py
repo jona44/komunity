@@ -14,9 +14,9 @@ class Wallet(models.Model):
         from decimal import Decimal
         from django.db.models import Sum
         
-        # Calculate Top-Ups
-        top_ups = self.transactions.filter(
-            transaction_type='TOP_UP',
+        # Calculate Incoming (Top-Ups + Payouts)
+        incoming = self.transactions.filter(
+            transaction_type__in=['TOP_UP', 'PAYOUT_RECEIVED'],
             status='COMPLETED'
         ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
 
@@ -26,13 +26,14 @@ class Wallet(models.Model):
             status='COMPLETED'
         ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
 
-        return top_ups - outgoing
+        return incoming - outgoing
 
 class Transaction(models.Model):
     class TransactionType(models.TextChoices):
         TOP_UP = 'TOP_UP', 'Top-Up'
         TRANSFER = 'TRANSFER', 'Transfer to Group'
         WITHDRAWAL = 'WITHDRAWAL', 'Withdrawal'
+        PAYOUT_RECEIVED = 'PAYOUT_RECEIVED', 'Payout Received'
 
     class TransactionStatus(models.TextChoices):
         PENDING = 'PENDING', 'Pending'

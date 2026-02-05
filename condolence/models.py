@@ -16,8 +16,10 @@ class Contribution(models.Model):
         ('cash', 'Cash'),
         ('bank_transfer', 'Bank Transfer'),
         ('mobile_money', 'Mobile Money'),
+        ('wallet', 'Wallet Balance'),
         ('other', 'Other'),
     ])
+    transaction = models.ForeignKey('wallet.Transaction', on_delete=models.SET_NULL, null=True, blank=True, related_name='contribution')
     contribution_date = models.DateField(auto_now_add=True)
     
     def __str__(self):
@@ -33,10 +35,34 @@ class Deceased(models.Model):
     group_admin = models.ForeignKey(Profile, on_delete=models.SET_NULL, null=True, blank=True, related_name='admin')
     contributions_open = models.BooleanField(default=True)
     cont_is_active = models.BooleanField(default=True)
+    
+    # Beneficiary & Payout
+    beneficiary = models.ForeignKey(Profile, on_delete=models.SET_NULL, null=True, blank=True, related_name='beneficiary_for')
+    funds_disbursed = models.BooleanField(default=False)
 
     def __str__ (self):
        return f"{self.deceased}"
    
     def stop_contributions(self):
         self.cont_is_active = False
+        self.contributions_open = False
         self.save()
+
+    def get_total_raised(self):
+        from django.db.models import Sum
+        return self.member_deceased.aggregate(total=Sum('amount'))['total'] or 0
+
+    def get_total_disbursed(self):
+        from django.db.models import Sum
+        # Sum of all payout transactions linked to this deceased member
+        return self.wallet_contributions.filter(
+            transaction_type='PAYOUT_RECEIVED', 
+            status='COMPLETED'
+        ).aggregate(total=Sum('amount'))['total'] or 0
+
+    def get_balance(self):
+        # Balance held by group for this deceased member (Raised - Disbursed)
+        from decimal import Decimal
+        raised = self.get_total_raised()
+        disbursed = self.get_total_disbursed()
+        return raised - disbursed
