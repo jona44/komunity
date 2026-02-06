@@ -18,7 +18,7 @@
                 {% elif tx.transaction_type == 'TRANSFER' %}
                     send
                 {% elif tx.transaction_type == 'PAYOUT_RECEIVED' %}
-                    Account_balance_wallet
+                    account_balance_wallet
                 {% else %}
                     swap_horiz
                 {% endif %}
@@ -32,7 +32,7 @@
                 {% elif tx.transaction_type == 'TRANSFER' %}
                     Transfer to {{ tx.destination_group.name|default:"Group"|title }}
                 {% elif tx.transaction_type == 'PAYOUT_RECEIVED' %}
-                    Disbursement Received
+                    Disbursement for {{ tx.deceased_contribution.deceased.full_name|default:"Member" }}
                 {% else %}
                     {{ tx.get_transaction_type_display }}
                 {% endif %}
