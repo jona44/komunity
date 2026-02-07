@@ -14,6 +14,7 @@ urlpatterns = [
     path('', include('user.urls')),
     path('', include('condolence.urls')),
     path('', include('wallet.urls')),
+    path('api/v1/', include('api_v1.urls')),
     
    
 ]

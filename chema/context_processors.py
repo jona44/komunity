@@ -32,13 +32,25 @@ def active_group_context(request):
     # Fallback to default active group logic if not in a specific group view
     if not active_group and request.user.is_authenticated:
         try:
-            # Look for the user's active membership
-            active_membership = GroupMembership.objects.filter(
-                member=request.user.profile, 
-                is_active=True
-            ).first()
+            # Check session first for the selected group
+            active_group_id = request.session.get('active_group_id')
+            active_membership = None
             
-            # If no membership is marked active, pick the first one
+            if active_group_id:
+                active_membership = GroupMembership.objects.filter(
+                    member=request.user.profile, 
+                    group_id=active_group_id,
+                    is_active=True
+                ).first()
+            
+            # If nothing in session or session group is invalid, fall back to DB marked active
+            if not active_membership:
+                active_membership = GroupMembership.objects.filter(
+                    member=request.user.profile, 
+                    is_active=True
+                ).first()
+            
+            # If no membership is marked active at all, pick the first one
             if not active_membership:
                 active_membership = GroupMembership.objects.filter(
                     member=request.user.profile
@@ -49,6 +61,9 @@ def active_group_context(request):
             
             if active_membership:
                 active_group = active_membership.group
+                # Sync session if it was empty
+                if not active_group_id:
+                    request.session['active_group_id'] = active_group.id
         except (Profile.DoesNotExist, AttributeError):
             pass
             

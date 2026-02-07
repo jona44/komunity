@@ -1,0 +1,502 @@
+import React, { useState, useEffect } from 'react';
+import {
+    View, Text, StyleSheet, ScrollView, TouchableOpacity,
+    Image, ActivityIndicator, Alert, TextInput
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import client from '../api/client';
+
+interface ProfileScreenProps {
+    onBack: () => void;
+    onLogout: () => void;
+    onProfileUpdate?: () => void;
+}
+
+const ProfileScreen = ({ onBack, onLogout, onProfileUpdate }: ProfileScreenProps) => {
+    const insets = useSafeAreaInsets();
+    const [profile, setProfile] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
+    const [isEditing, setIsEditing] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+
+    // Editable fields
+    const [firstName, setFirstName] = useState('');
+    const [surname, setSurname] = useState('');
+    const [phone, setPhone] = useState('');
+    const [dob, setDob] = useState('');
+    const [culturalBackground, setCulturalBackground] = useState('');
+    const [religiousAffiliation, setReligiousAffiliation] = useState('');
+    const [traditionalNames, setTraditionalNames] = useState('');
+    const [bio, setBio] = useState('');
+
+    useEffect(() => {
+        fetchProfile();
+    }, []);
+
+    const fetchProfile = async () => {
+        try {
+            const response = await client.get('users/me/');
+            const data = response.data;
+            setProfile(data);
+
+            // Initialize editable fields
+            setFirstName(data.profile?.first_name || '');
+            setSurname(data.profile?.surname || '');
+            setPhone(data.profile?.phone || '');
+            setDob(data.profile?.date_of_birth || '');
+            setCulturalBackground(data.profile?.cultural_background || '');
+            setReligiousAffiliation(data.profile?.religious_affiliation || '');
+            setTraditionalNames(data.profile?.traditional_names || '');
+            setBio(data.profile?.bio || '');
+        } catch (error) {
+            console.error('Error fetching profile:', error);
+            Alert.alert('Error', 'Failed to load profile');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSave = async () => {
+        if (!profile?.profile?.id) return;
+
+        setIsSaving(true);
+        try {
+            const response = await client.patch(`profiles/${profile.profile.id}/`, {
+                first_name: firstName,
+                surname: surname,
+                phone: phone,
+                date_of_birth: dob || null,
+                cultural_background: culturalBackground,
+                religious_affiliation: religiousAffiliation,
+                traditional_names: traditionalNames,
+                bio: bio
+            });
+
+            Alert.alert('Success', 'Profile updated successfully');
+            setIsEditing(false);
+            fetchProfile(); // Refresh local data
+            onProfileUpdate?.(); // Refresh global data (like nav bar)
+        } catch (error: any) {
+            console.error('Error saving profile:', error);
+            const errorMsg = error.response?.data ? JSON.stringify(error.response.data) : 'Failed to update profile';
+            Alert.alert('Error', errorMsg);
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleLogout = () => {
+        Alert.alert(
+            'Logout',
+            'Are you sure you want to logout?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Logout',
+                    style: 'destructive',
+                    onPress: () => {
+                        console.log('ProfileScreen: Logout confirmed');
+                        onLogout();
+                    }
+                }
+            ]
+        );
+    };
+
+    if (loading) {
+        return (
+            <View style={[styles.container, styles.centered, { paddingTop: insets.top }]}>
+                <ActivityIndicator size="large" color="#2563eb" />
+            </View>
+        );
+    }
+
+    return (
+        <View style={[styles.container, { paddingTop: insets.top }]}>
+            <View style={styles.header}>
+                <TouchableOpacity onPress={onBack} style={styles.backButton}>
+                    <Text style={styles.backButtonText}>←</Text>
+                </TouchableOpacity>
+                <Text style={styles.headerTitle}>My Profile</Text>
+                <View style={{ width: 40 }} />
+            </View>
+
+            <ScrollView style={styles.content}>
+                {/* Profile Header */}
+                <View style={styles.profileHeader}>
+                    <View style={styles.avatarContainer}>
+                        {profile?.profile?.profile_picture ? (
+                            <Image
+                                source={{ uri: profile.profile.profile_picture }}
+                                style={styles.avatar}
+                            />
+                        ) : (
+                            <View style={styles.avatarPlaceholder}>
+                                <Text style={styles.avatarText}>
+                                    {profile?.profile?.full_name?.[0]?.toUpperCase() || profile?.email?.[0]?.toUpperCase() || '?'}
+                                </Text>
+                            </View>
+                        )}
+                    </View>
+                    <Text style={styles.profileName}>
+                        {isEditing ? `${firstName} ${surname}`.trim() || 'New User' : profile?.profile?.full_name || 'No name set'}
+                    </Text>
+                    <Text style={styles.profileEmail}>{profile?.email}</Text>
+                </View>
+
+                {/* Profile Details */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Personal Information</Text>
+
+                    <View style={styles.infoRow}>
+                        <Text style={styles.infoLabel}>First Name</Text>
+                        {isEditing ? (
+                            <TextInput
+                                style={styles.editInput}
+                                value={firstName}
+                                onChangeText={setFirstName}
+                                placeholder="First Name"
+                            />
+                        ) : (
+                            <Text style={styles.infoValue}>
+                                {profile?.profile?.first_name || 'Not set'}
+                            </Text>
+                        )}
+                    </View>
+
+                    <View style={styles.infoRow}>
+                        <Text style={styles.infoLabel}>Surname</Text>
+                        {isEditing ? (
+                            <TextInput
+                                style={styles.editInput}
+                                value={surname}
+                                onChangeText={setSurname}
+                                placeholder="Surname"
+                            />
+                        ) : (
+                            <Text style={styles.infoValue}>
+                                {profile?.profile?.surname || 'Not set'}
+                            </Text>
+                        )}
+                    </View>
+
+                    <View style={styles.infoRow}>
+                        <Text style={styles.infoLabel}>Phone</Text>
+                        {isEditing ? (
+                            <TextInput
+                                style={styles.editInput}
+                                value={phone}
+                                onChangeText={setPhone}
+                                placeholder="Phone"
+                                keyboardType="phone-pad"
+                            />
+                        ) : (
+                            <Text style={styles.infoValue}>
+                                {profile?.profile?.phone || 'Not set'}
+                            </Text>
+                        )}
+                    </View>
+
+                    <View style={styles.infoRow}>
+                        <Text style={styles.infoLabel}>Date of Birth</Text>
+                        {isEditing ? (
+                            <TextInput
+                                style={styles.editInput}
+                                value={dob}
+                                onChangeText={setDob}
+                                placeholder="YYYY-MM-DD"
+                            />
+                        ) : (
+                            <Text style={styles.infoValue}>
+                                {profile?.profile?.date_of_birth || 'Not set'}
+                            </Text>
+                        )}
+                    </View>
+                </View>
+
+                {/* Cultural Information */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Cultural & Religious</Text>
+
+                    <View style={styles.infoRow}>
+                        <Text style={styles.infoLabel}>Cultural Background</Text>
+                        {isEditing ? (
+                            <TextInput
+                                style={styles.editInput}
+                                value={culturalBackground}
+                                onChangeText={setCulturalBackground}
+                                placeholder="Cultural Background"
+                            />
+                        ) : (
+                            <Text style={styles.infoValue}>
+                                {profile?.profile?.cultural_background || 'Not set'}
+                            </Text>
+                        )}
+                    </View>
+
+                    <View style={styles.infoRow}>
+                        <Text style={styles.infoLabel}>Religious Affiliation</Text>
+                        {isEditing ? (
+                            <TextInput
+                                style={styles.editInput}
+                                value={religiousAffiliation}
+                                onChangeText={setReligiousAffiliation}
+                                placeholder="Religious Affiliation"
+                            />
+                        ) : (
+                            <Text style={styles.infoValue}>
+                                {profile?.profile?.religious_affiliation || 'Not set'}
+                            </Text>
+                        )}
+                    </View>
+
+                    <View style={styles.infoRow}>
+                        <Text style={styles.infoLabel}>Traditional Names</Text>
+                        {isEditing ? (
+                            <TextInput
+                                style={styles.editInput}
+                                value={traditionalNames}
+                                onChangeText={setTraditionalNames}
+                                placeholder="Traditional Names"
+                            />
+                        ) : (
+                            <Text style={styles.infoValue}>
+                                {profile?.profile?.traditional_names || 'Not set'}
+                            </Text>
+                        )}
+                    </View>
+                </View>
+
+                {/* Bio */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>About Me</Text>
+                    {isEditing ? (
+                        <TextInput
+                            style={[styles.editInput, styles.bioInput]}
+                            value={bio}
+                            onChangeText={setBio}
+                            placeholder="Write something about yourself..."
+                            multiline
+                        />
+                    ) : (
+                        <Text style={styles.bioText}>{profile?.profile?.bio || 'No bio yet.'}</Text>
+                    )}
+                </View>
+
+                {/* Actions */}
+                <View style={styles.section}>
+                    {isEditing ? (
+                        <>
+                            <TouchableOpacity
+                                style={[styles.actionButton, isSaving && styles.disabledButton]}
+                                onPress={handleSave}
+                                disabled={isSaving}
+                            >
+                                {isSaving ? (
+                                    <ActivityIndicator color="#ffffff" />
+                                ) : (
+                                    <Text style={styles.actionButtonText}>Save Changes</Text>
+                                )}
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.actionButton, styles.cancelButton]}
+                                onPress={() => setIsEditing(false)}
+                                disabled={isSaving}
+                            >
+                                <Text style={[styles.actionButtonText, styles.cancelText]}>Cancel</Text>
+                            </TouchableOpacity>
+                        </>
+                    ) : (
+                        <>
+                            <TouchableOpacity
+                                style={styles.actionButton}
+                                onPress={() => setIsEditing(true)}
+                            >
+                                <Text style={styles.actionButtonText}>Edit Profile</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={[styles.actionButton, styles.logoutButton]}
+                                onPress={handleLogout}
+                            >
+                                <Text style={[styles.actionButtonText, styles.logoutText]}>Logout</Text>
+                            </TouchableOpacity>
+                        </>
+                    )}
+                </View>
+
+                <View style={{ height: 100 }} />
+            </ScrollView>
+        </View>
+    );
+};
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: '#f9fafb',
+    },
+    centered: {
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingVertical: 16,
+        backgroundColor: '#ffffff',
+        borderBottomWidth: 1,
+        borderBottomColor: '#e5e7eb',
+    },
+    backButton: {
+        width: 40,
+        height: 40,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    backButtonText: {
+        fontSize: 24,
+        color: '#111827',
+    },
+    headerTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#111827',
+    },
+    content: {
+        flex: 1,
+    },
+    profileHeader: {
+        backgroundColor: '#ffffff',
+        alignItems: 'center',
+        paddingVertical: 32,
+        borderBottomWidth: 1,
+        borderBottomColor: '#e5e7eb',
+    },
+    avatarContainer: {
+        marginBottom: 16,
+    },
+    avatar: {
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+    },
+    avatarPlaceholder: {
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        backgroundColor: '#eff6ff',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: '#dbeafe',
+    },
+    avatarText: {
+        fontSize: 40,
+        fontWeight: 'bold',
+        color: '#2563eb',
+    },
+    profileName: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        color: '#111827',
+        marginBottom: 4,
+    },
+    profileEmail: {
+        fontSize: 14,
+        color: '#6b7280',
+    },
+    section: {
+        backgroundColor: '#ffffff',
+        marginTop: 16,
+        paddingHorizontal: 16,
+        paddingVertical: 20,
+        borderTopWidth: 1,
+        borderBottomWidth: 1,
+        borderColor: '#e5e7eb',
+    },
+    sectionTitle: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#111827',
+        marginBottom: 16,
+    },
+    infoRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f3f4f6',
+    },
+    infoLabel: {
+        fontSize: 14,
+        color: '#6b7280',
+        fontWeight: '500',
+    },
+    infoValue: {
+        fontSize: 14,
+        color: '#111827',
+        fontWeight: '600',
+        textAlign: 'right',
+        flex: 1,
+        marginLeft: 16,
+    },
+    bioText: {
+        fontSize: 14,
+        color: '#374151',
+        lineHeight: 20,
+    },
+    actionButton: {
+        backgroundColor: '#2563eb',
+        paddingVertical: 14,
+        borderRadius: 8,
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    actionButtonText: {
+        color: '#ffffff',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    logoutButton: {
+        backgroundColor: '#ffffff',
+        borderWidth: 1,
+        borderColor: '#ef4444',
+    },
+    logoutText: {
+        color: '#ef4444',
+    },
+    editInput: {
+        flex: 1,
+        fontSize: 14,
+        color: '#111827',
+        fontWeight: '600',
+        textAlign: 'right',
+        marginLeft: 16,
+        paddingVertical: 4,
+        borderBottomWidth: 1,
+        borderBottomColor: '#2563eb',
+    },
+    bioInput: {
+        textAlign: 'left',
+        marginLeft: 0,
+        marginTop: 8,
+        minHeight: 80,
+    },
+    cancelButton: {
+        backgroundColor: '#ffffff',
+        borderWidth: 1,
+        borderColor: '#6b7280',
+    },
+    cancelText: {
+        color: '#6b7280',
+    },
+    disabledButton: {
+        opacity: 0.5,
+    },
+});
+
+export default ProfileScreen;

@@ -34,6 +34,27 @@ class Group(models.Model):
     def get_total_members(self):
         return self.members.count()
 
+    def get_balance(self):
+        from wallet.models import Transaction
+        from django.db.models import Sum
+        from decimal import Decimal
+        
+        # Incoming: Transfers from members
+        incoming = Transaction.objects.filter(
+            destination_group=self,
+            transaction_type='TRANSFER',
+            status='COMPLETED'
+        ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+        
+        # Outgoing: Payouts/Disbursements to members
+        outgoing = Transaction.objects.filter(
+            destination_group=self,
+            transaction_type='PAYOUT_RECEIVED',
+            status='COMPLETED'
+        ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+        
+        return incoming - outgoing
+
     def __str__(self):
         return self.name
 
@@ -138,14 +159,18 @@ class GroupMembership(models.Model):
 class Post(models.Model):
     author = models.ForeignKey(Profile, on_delete=models.CASCADE, null=True, blank=True)
     group = models.ForeignKey(Group, on_delete=models.CASCADE, null=True, blank=True)
-    content = models.TextField()
+    content = models.TextField(blank=True, null=True)
     image = models.ImageField(upload_to='post_images/', null=True, blank=True)
     video = models.FileField(upload_to='post_videos/', null=True, blank=True)
+    likes = models.ManyToManyField(Profile, related_name='liked_posts', blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     approved = models.BooleanField(default=True, null=True, blank=True)
 
     def __str__(self):
         return f"{self.author.full_name}: {self.content}"
+
+    def get_likes_count(self):
+        return self.likes.count()
 
 
 
@@ -163,7 +188,7 @@ class PostImage(models.Model):
 
 class Comment(models.Model):
     post = models.ForeignKey(Post, on_delete=models.CASCADE)
-    author = models.ForeignKey(Profile, on_delete=models.CASCADE)
+    author = models.ForeignKey(Profile, on_delete=models.CASCADE, null=True, blank=True)
     content = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
 

@@ -18,19 +18,30 @@ def home(request):
     user = request.user.profile
     search_form = SearchForm()
     
-    # Get the active group based on user membership
-    active_membership = GroupMembership.objects.filter(member=user, is_active=True).first()
+    # Get the active group based on session or membership
+    active_group_id = request.session.get('active_group_id')
+    active_membership = None
+    
+    if active_group_id:
+        active_membership = GroupMembership.objects.filter(member=user, group_id=active_group_id, is_active=True).first()
+    
+    if not active_membership:
+        active_membership = GroupMembership.objects.filter(member=user, is_active=True).first()
     
     if not active_membership:
         active_membership = GroupMembership.objects.filter(member=user).first()
         if active_membership:
             active_membership.is_active = True
             active_membership.save()
+            request.session['active_group_id'] = active_membership.group.id
 
     if not active_membership:
         return redirect('group_discovery')
 
     active_group = active_membership.group
+    # Ensure session is in sync
+    if not request.session.get('active_group_id'):
+        request.session['active_group_id'] = active_group.id
 
     deceased      = Deceased.objects.filter(group=active_group)
     contributions = Contribution.objects.filter(deceased_member_id__contributions_open=True, group=active_group)
@@ -681,20 +692,28 @@ def my_groups(request):
     
     # Handle group switching via tabs
     if switch_id:
-        membership = get_object_or_404(GroupMembership, member=user, group_id=switch_id)
-        membership.is_active = True
-        membership.save()
-        # Deactivate others for this user
-        GroupMembership.objects.filter(member=user).exclude(id=membership.id).update(is_active=False)
+        request.session['active_group_id'] = int(switch_id)
+        # Ensure membership is marked as active if it wasn't
+        GroupMembership.objects.filter(member=user, group_id=switch_id).update(is_active=True)
 
     groups = user.groups.all()
-    # Find active group
-    active_membership = GroupMembership.objects.filter(member=user, is_active=True).first()
+    # Find active group from session or fallback to first active membership
+    active_group_id = request.session.get('active_group_id')
+    active_membership = None
+    
+    if active_group_id:
+        active_membership = GroupMembership.objects.filter(member=user, group_id=active_group_id, is_active=True).first()
+    
+    if not active_membership:
+        active_membership = GroupMembership.objects.filter(member=user, is_active=True).first()
+    
     if not active_membership and groups.exists():
         active_membership = GroupMembership.objects.filter(member=user).first()
-        active_membership.is_active = True
-        active_membership.save()
-        
+        if active_membership:
+            active_membership.is_active = True
+            active_membership.save()
+            request.session['active_group_id'] = active_membership.group.id
+            
     active_group = active_membership.group if active_membership else None
     admins_as_members = active_group.get_admins() if active_group else []
     
@@ -726,12 +745,12 @@ def toggle_group(request, group_id):
     # Get the membership being toggled
     membership = get_object_or_404(GroupMembership, member=user, group_id=group_id)
     
-    # Set this one to active
+    # Store in session
+    request.session['active_group_id'] = int(group_id)
+    
+    # Ensure this membership is active
     membership.is_active = True
     membership.save()
-
-    # Deactivate all other memberships for THIS user
-    GroupMembership.objects.filter(member=user).exclude(id=membership.id).update(is_active=False)
 
     # If HTMX request, return the updated content instead of redirecting
     if request.headers.get('HX-Request'):

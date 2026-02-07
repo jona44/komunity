@@ -8,8 +8,8 @@ SECRET_KEY = 'django-insecure-l1u#8qmj&mfygs(0exmn%#-=jr8!$5gt5&_7)w@z8wf*ep%!(m
 
 DEBUG = True
 
-ALLOWED_HOSTS = ['chemaonline.azurewebsites.net','127.0.0.1','chema.com','localhost:8000','chemaonline.azurewebsites.net']
-CSRF_TRUSTED_ORIGINS = ['https://chemaonline.azurewebsites.net','https://127.0.0.1','https://chema.com']
+ALLOWED_HOSTS = ['chemaonline.azurewebsites.net','127.0.0.1','chema.com','localhost:8000','chemaonline.azurewebsites.net', '192.168.88.245']
+CSRF_TRUSTED_ORIGINS = ['https://chemaonline.azurewebsites.net','https://127.0.0.1','https://chema.com', 'http://192.168.88.245:8000']
 
 
 INSTALLED_APPS = [
@@ -27,6 +27,10 @@ INSTALLED_APPS = [
     'crispy_forms',
     'crispy_tailwind',
     'wallet',
+    'rest_framework',
+    'rest_framework.authtoken',
+    'corsheaders',
+    'api_v1',
     
     'allauth',
     'allauth.account',
@@ -47,6 +51,7 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     "allauth.account.middleware.AccountMiddleware",
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -197,3 +202,15 @@ SOCIALACCOUNT_PROVIDERS = {
         }
     }
 }
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+}
+
+CORS_ALLOW_ALL_ORIGINS = True # In production, specify allowed origins

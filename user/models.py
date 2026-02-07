@@ -95,8 +95,8 @@ class Profile(models.Model):
     
     def check_completion(self):
         """Check if profile has minimum required fields filled"""
-        required_fields  = [self.first_name, self.surname]
-        self.is_complete = all(field.strip() for field in required_fields if field)
+        self.is_complete = bool(self.first_name and self.first_name.strip() and 
+                               self.surname and self.surname.strip())
         return self.is_complete
 
     class Meta:

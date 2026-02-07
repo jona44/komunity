@@ -14,15 +14,15 @@ class Wallet(models.Model):
         from decimal import Decimal
         from django.db.models import Sum
         
-        # Calculate Incoming (Top-Ups + Payouts)
+        # Calculate Incoming (Top-Ups + Payouts + Received Transfers)
         incoming = self.transactions.filter(
-            transaction_type__in=['TOP_UP', 'PAYOUT_RECEIVED'],
+            transaction_type__in=['TOP_UP', 'PAYOUT_RECEIVED', 'P2P_RECEIVED'],
             status='COMPLETED'
         ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
 
-        # Calculate Outgoing (Transfers + Withdrawals)
+        # Calculate Outgoing (Transfers + Withdrawals + Sent Transfers)
         outgoing = self.transactions.filter(
-            transaction_type__in=['TRANSFER', 'WITHDRAWAL'],
+            transaction_type__in=['TRANSFER', 'WITHDRAWAL', 'P2P_SENT'],
             status='COMPLETED'
         ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
 
@@ -34,6 +34,8 @@ class Transaction(models.Model):
         TRANSFER = 'TRANSFER', 'Transfer to Group'
         WITHDRAWAL = 'WITHDRAWAL', 'Withdrawal'
         PAYOUT_RECEIVED = 'PAYOUT_RECEIVED', 'Payout Received'
+        P2P_SENT = 'P2P_SENT', 'Peer-to-Peer Sent'
+        P2P_RECEIVED = 'P2P_RECEIVED', 'Peer-to-Peer Received'
 
     class TransactionStatus(models.TextChoices):
         PENDING = 'PENDING', 'Pending'
@@ -47,6 +49,7 @@ class Transaction(models.Model):
     
     # Where the money went (if applicable)
     destination_group = models.ForeignKey(Group, on_delete=models.SET_NULL, null=True, blank=True)
+    recipient_wallet = models.ForeignKey(Wallet, on_delete=models.SET_NULL, null=True, blank=True, related_name="incoming_transfers")
     deceased_contribution = models.ForeignKey('condolence.Deceased', on_delete=models.SET_NULL, null=True, blank=True, related_name='wallet_contributions')
 
     
