@@ -8,6 +8,7 @@ interface Group {
     description: string;
     cover_image: string | null;
     total_members: number;
+    is_selected: boolean;
 }
 
 interface HomeScreenProps {
@@ -36,6 +37,16 @@ const HomeScreen = ({ onSelectGroup, onViewGroupDetails, onViewWallet, onDiscove
         }
     };
 
+    const handleSelectGroup = async (groupId: number) => {
+        try {
+            await client.post(`groups/${groupId}/select/`);
+            // Refresh groups to reflect selection change
+            fetchGroups();
+        } catch (error) {
+            console.error('Error selecting group:', error);
+        }
+    };
+
     if (loading) {
         return (
             <View style={styles.centered}>
@@ -60,7 +71,10 @@ const HomeScreen = ({ onSelectGroup, onViewGroupDetails, onViewWallet, onDiscove
                 keyExtractor={(item) => item.id.toString()}
                 contentContainerStyle={styles.listContent}
                 renderItem={({ item }) => (
-                    <View style={styles.groupCard}>
+                    <TouchableOpacity
+                        style={styles.groupCard}
+                        onPress={() => onViewGroupDetails?.(item)}
+                    >
                         {item.cover_image ? (
                             <Image source={{ uri: item.cover_image }} style={styles.coverImage} />
                         ) : (
@@ -80,10 +94,12 @@ const HomeScreen = ({ onSelectGroup, onViewGroupDetails, onViewWallet, onDiscove
 
                             <View style={styles.actionRow}>
                                 <TouchableOpacity
-                                    style={styles.detailsButton}
-                                    onPress={() => onViewGroupDetails?.(item)}
+                                    style={[styles.detailsButton, item.is_selected && styles.selectedButton]}
+                                    onPress={() => handleSelectGroup(item.id)}
                                 >
-                                    <Text style={styles.detailsButtonText}>Details</Text>
+                                    <Text style={[styles.detailsButtonText, item.is_selected && styles.selectedButtonText]}>
+                                        {item.is_selected ? 'Selected' : 'Select'}
+                                    </Text>
                                 </TouchableOpacity>
 
                                 <TouchableOpacity
@@ -97,7 +113,7 @@ const HomeScreen = ({ onSelectGroup, onViewGroupDetails, onViewWallet, onDiscove
                                 </TouchableOpacity>
                             </View>
                         </View>
-                    </View>
+                    </TouchableOpacity>
                 )}
                 ListEmptyComponent={
                     <View style={styles.emptyContainer}>
@@ -225,6 +241,13 @@ const styles = StyleSheet.create({
         color: '#16a34a',
         fontWeight: 'bold',
         fontSize: 14,
+    },
+    selectedButton: {
+        backgroundColor: '#16a34a',
+        borderColor: '#16a34a',
+    },
+    selectedButtonText: {
+        color: '#ffffff',
     },
     notificationBadge: {
         backgroundColor: '#ef4444',

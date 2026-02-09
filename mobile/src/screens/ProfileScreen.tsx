@@ -353,12 +353,15 @@ const styles = StyleSheet.create({
     backButton: {
         width: 40,
         height: 40,
+        borderRadius: 20,
+        backgroundColor: '#eff6ff',
         justifyContent: 'center',
         alignItems: 'center',
     },
     backButtonText: {
         fontSize: 24,
-        color: '#111827',
+        color: '#2563eb',
+        fontWeight: 'bold',
     },
     headerTitle: {
         fontSize: 18,

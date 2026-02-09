@@ -681,7 +681,12 @@ const styles = StyleSheet.create({
         borderBottomColor: '#e5e7eb',
     },
     backButton: {
-        padding: 4,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#eff6ff',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     backButtonText: {
         fontSize: 24,

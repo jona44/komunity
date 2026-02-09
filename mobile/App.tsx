@@ -108,18 +108,10 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <View style={{ flex: 1 }}>
-        {selectedPost ? (
-          <PostDetailScreen post={selectedPost} onBack={() => setSelectedPost(null)} />
-        ) : isCreatingPost ? (
-          <CreatePostScreen
-            group={selectedGroup}
-            onBack={() => setIsCreatingPost(false)}
-            onPostCreated={() => setIsCreatingPost(false)}
-          />
-        ) : viewingMemberProfile ? (
+        {viewingMemberProfile ? (
           <MemberProfileScreen
             membership={viewingMemberProfile}
-            isAdmin={selectedGroup?.is_admin || isManagingGroup?.is_admin}
+            isAdmin={selectedGroup?.is_admin || isManagingGroup?.is_admin || viewingGroupDetails?.is_admin}
             onBack={() => setViewingMemberProfile(null)}
             onStatusChange={() => { }}
           />
@@ -129,6 +121,11 @@ export default function App() {
             onBack={() => setIsViewingAllMembers(null)}
             onSelectMember={(membership) => setViewingMemberProfile(membership)}
           />
+        ) : viewingGroupWallet ? (
+          <GroupWalletScreen
+            group={viewingGroupWallet}
+            onBack={() => setViewingGroupWallet(null)}
+          />
         ) : isManagingGroup ? (
           <GroupManagementScreen
             group={isManagingGroup}
@@ -136,13 +133,15 @@ export default function App() {
             onSelectMember={(membership) => setViewingMemberProfile(membership)}
             onViewWallet={() => {
               setViewingGroupWallet(isManagingGroup);
-              setIsManagingGroup(null);
             }}
           />
-        ) : viewingGroupWallet ? (
-          <GroupWalletScreen
-            group={viewingGroupWallet}
-            onBack={() => setViewingGroupWallet(null)}
+        ) : selectedPost ? (
+          <PostDetailScreen post={selectedPost} onBack={() => setSelectedPost(null)} />
+        ) : isCreatingPost ? (
+          <CreatePostScreen
+            group={selectedGroup}
+            onBack={() => setIsCreatingPost(false)}
+            onPostCreated={() => setIsCreatingPost(false)}
           />
         ) : viewingGroupDetails ? (
           <GroupDetailScreen
@@ -150,20 +149,17 @@ export default function App() {
             onBack={() => setViewingGroupDetails(null)}
             onViewFeed={() => {
               setSelectedGroup(viewingGroupDetails);
-              setViewingGroupDetails(null);
+              setViewingGroupDetails(null); // Clear context when jumping to feed to make feed primary
             }}
             onManage={() => {
               setIsManagingGroup(viewingGroupDetails);
-              setViewingGroupDetails(null);
             }}
             onSelectMember={(membership) => setViewingMemberProfile(membership)}
             onViewAllMembers={() => {
               setIsViewingAllMembers(viewingGroupDetails);
-              setViewingGroupDetails(null);
             }}
             onViewWallet={() => {
               setViewingGroupWallet(viewingGroupDetails);
-              setViewingGroupDetails(null);
             }}
           />
         ) : selectedGroup ? (

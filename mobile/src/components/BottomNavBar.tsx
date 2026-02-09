@@ -18,7 +18,7 @@ const BottomNavBar = ({ activeTab, onTabPress, profilePicture }: BottomNavBarPro
                 onPress={() => onTabPress('home')}
             >
                 <Text style={[styles.navIcon, activeTab === 'home' && styles.activeIcon]}>🏠</Text>
-                <Text style={[styles.navText, activeTab === 'home' && styles.activeText]}>Home</Text>
+                <Text style={[styles.navText, activeTab === 'home' && styles.activeText]}>My Groups</Text>
             </TouchableOpacity>
 
             <TouchableOpacity

@@ -92,6 +92,16 @@ class GroupViewSet(viewsets.ModelViewSet):
         GroupMembership.objects.filter(group=group, member=profile).update(is_active=False, status='inactive')
         return Response({'status': 'left'}, status=status.HTTP_200_OK)
 
+    @action(detail=True, methods=['post'])
+    def select(self, request, pk=None):
+        group = self.get_object()
+        profile = request.user.profile
+        # Set this one as active in DB (will be used as fallback on web and primary on mobile)
+        GroupMembership.objects.filter(member=profile, group=group).update(is_active=True)
+        # Deactivate others for this user
+        GroupMembership.objects.filter(member=profile).exclude(group=group).update(is_active=False)
+        return Response({'status': 'selected'})
+
     @action(detail=True, methods=['get'])
     def members(self, request, pk=None):
         group = self.get_object()

@@ -16,13 +16,25 @@ class GroupSerializer(serializers.ModelSerializer):
     total_members = serializers.IntegerField(source='get_total_members', read_only=True)
     balance = serializers.DecimalField(source='get_balance', max_digits=10, decimal_places=2, read_only=True)
     is_admin = serializers.SerializerMethodField()
+    is_selected = serializers.SerializerMethodField()
 
     class Meta:
         model = Group
         fields = [
             'id', 'name', 'is_active', 'description', 'cover_image', 
-            'total_members', 'requires_approval', 'created_at', 'is_admin', 'balance'
+            'total_members', 'requires_approval', 'created_at', 'is_admin', 'balance',
+            'is_selected'
         ]
+
+    def get_is_selected(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            try:
+                membership = GroupMembership.objects.filter(group=obj, member=request.user.profile).first()
+                return membership.is_active if membership else False
+            except Exception:
+                return False
+        return False
 
     def get_is_admin(self, obj):
         request = self.context.get('request')

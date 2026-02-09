@@ -185,6 +185,8 @@ const styles = StyleSheet.create({
     backButton: {
         width: 40,
         height: 40,
+        borderRadius: 20,
+        backgroundColor: '#eff6ff',
         justifyContent: 'center',
         alignItems: 'center',
     },
