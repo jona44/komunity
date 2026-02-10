@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, SafeAreaView, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
-import client, { setAuthToken } from '../api/client';
+import client, { setAuthToken, saveToken } from '../api/client';
 
 interface SignUpProps {
     onSignUpSuccess: (token: string) => void;
@@ -45,6 +45,7 @@ const SignUpScreen = ({ onSignUpSuccess, onBackToLogin }: SignUpProps) => {
 
             const token = loginResponse.data.token;
             setAuthToken(token);
+            await saveToken(token);
             onSignUpSuccess(token);
         } catch (error: any) {
             console.error(error);

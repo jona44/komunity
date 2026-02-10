@@ -1,0 +1,198 @@
+================================================================================
+  KOMUNITY PLATFORM — TODO LIST
+  Generated: 2026-02-10
+================================================================================
+
+
+========================================
+  PHASE 1 — CORE GAPS (High Priority)
+========================================
+
+[x] 1. Secure Token Storage (expo-secure-store) ✅ DONE
+      - App restart currently logs the user out
+      - Persist auth token in secure storage
+      - Auto-login on app launch if token exists
+      - Files: mobile/App.tsx, mobile/src/api/client.ts
+
+[ ] 2. Password Reset on Mobile
+      - Add "Forgot Password?" link on LoginScreen
+      - Create PasswordResetScreen (email input → backend sends reset email)
+      - Backend already supports: /password-reset/, /password-reset-confirm/
+      - Files: mobile/src/screens/LoginScreen.tsx (new screen needed)
+
+[ ] 3. Pull-to-Refresh Everywhere
+      - HomeScreen (My Groups list)
+      - GroupFeedScreen (posts list)
+      - DiscoveryScreen (explore groups)
+      - GroupDetailScreen (members preview)
+      - GroupManagementScreen (members + deceased)
+      - WalletScreen already has it ✅
+      - Use React Native RefreshControl component
+
+[ ] 4. Reply to Comments on Mobile
+      - PostDetailScreen currently shows replies but can't create them
+      - Add reply input for each comment
+      - API exists: ReplyViewSet (POST /api/v1/replies/)
+      - Files: mobile/src/screens/PostDetailScreen.tsx
+
+[ ] 5. Edit/Delete Own Comments on Mobile
+      - Add edit and delete actions to own comments
+      - Show context menu (long-press or ... button)
+      - API exists: CommentViewSet supports PUT/PATCH/DELETE
+      - Files: mobile/src/screens/PostDetailScreen.tsx
+
+
+========================================
+  PHASE 2 — ENHANCED ENGAGEMENT
+========================================
+
+[ ] 6. Push Notifications (expo-notifications)
+      - New post in your group
+      - Contribution received
+      - Membership approved/rejected
+      - Deceased member declared
+      - Funds disbursed
+      - Requires: backend notification model + FCM/APNs setup
+      - Package: expo-notifications
+
+[ ] 7. Edit Posts on Mobile
+      - Users can create and delete but can't edit posts
+      - Add edit button on own posts in PostDetailScreen
+      - API supports PATCH on PostViewSet
+      - Files: mobile/src/screens/PostDetailScreen.tsx (new EditPostScreen?)
+
+[ ] 8. Search on Mobile
+      - Web has search across groups and members
+      - Add search bar to HomeScreen and/or DiscoveryScreen
+      - Backend: chema/views.py search_view exists
+      - Need API endpoint for search (or use existing group list with query param)
+
+[ ] 9. Contributions List/History on Mobile
+      - Web has rich contribution tracking page with filters
+      - Mobile only handles contribution creation
+      - Add ContributionsScreen showing history per group/deceased
+      - API: ContributionViewSet exists
+
+[ ] 10. Edit Group on Mobile (Admin)
+       - Admins can manage members but can't edit group info
+       - Add edit group name, description, cover image
+       - API supports PATCH on GroupViewSet
+       - Files: new screen or modal in GroupDetailScreen
+
+
+========================================
+  PHASE 3 — POLISH & GROWTH
+========================================
+
+[ ] 11. Animated Page Transitions
+       - Current screen switches are instant cuts
+       - Add react-native-reanimated or react-navigation for smooth transitions
+       - Consider shared element transitions for group cards → detail
+
+[ ] 12. Pagination for Feeds
+       - No FlatList pagination currently — loads all data at once
+       - Add infinite scroll to GroupFeedScreen, DiscoveryScreen, contributions
+       - Backend: add ?page= and ?page_size= to viewsets (DRF pagination)
+
+[ ] 13. Camera Integration
+       - Currently only gallery picker for profile/post photos
+       - Add option to take photo directly with expo-camera
+       - Files: ProfileSetupScreen, ProfileScreen, CreatePostScreen
+
+[ ] 14. Biometric Auth for Wallet Transactions
+       - Use expo-local-authentication for fingerprint/face ID
+       - Require biometric before: send money, top-up, disburse funds
+       - Package: expo-local-authentication
+
+[ ] 15. Deep Linking
+       - Open specific group/post from notification or shared URL
+       - Configure URL scheme in app.json
+       - Package: expo-linking
+
+[ ] 16. Image Caching
+       - No image caching — scroll performance suffers with many profile pics
+       - Switch to expo-image (built-in caching, blurhash, transitions)
+       - Replace <Image> with <ExpoImage> across screens
+
+[ ] 17. Loading Skeletons
+       - Replace ActivityIndicator spinners with shimmer placeholders
+       - More polished loading experience
+       - Consider: react-native-skeleton-placeholder or custom
+
+[ ] 18. Haptic Feedback
+       - Add tactile feedback on: like, send money, join, approve member
+       - Package: expo-haptics
+       - Quick win for premium feel
+
+[ ] 19. Share Posts
+       - Allow users to share posts outside the app
+       - Use Expo Share API
+       - Add share button to post footer (currently has placeholder 🚀 share)
+
+[ ] 20. Invite via Contacts (Future)
+       - Let users invite friends to join communities
+       - Package: expo-contacts
+       - Needs backend invite/referral system
+
+
+========================================
+  WEB-ONLY FEATURES (Not needed on mobile)
+========================================
+
+  - CSV Upload (bulk member import) — admin tool, web-only is fine
+  - Post Approval flow — admin tool, low priority for mobile
+  - HTMX interactions — web-specific, native has its own patterns
+
+
+========================================
+  INVERTED GAPS (Mobile has, Web doesn't)
+========================================
+
+[ ] 21. Post Likes on Web
+       - Mobile has like/unlike, web doesn't
+       - Add HTMX like button to web post template
+
+[ ] 22. P2P Wallet Transfers on Web
+       - Mobile has send money to members, web doesn't
+       - Add P2P transfer view/template to wallet app
+
+[ ] 23. Unread Feed Counter on Web
+       - Mobile has unread badge on Discussion Feed button
+       - Port to web using last_viewed_at field (already in DB)
+
+
+========================================
+  BUGS & TECH DEBT
+========================================
+
+[ ] 24. Lint Errors in ProfileScreen.tsx
+       - Several lint warnings from profile picture implementation
+       - Review and clean up
+
+[ ] 25. Discovery Screen — Filter Out Joined Groups
+       - Currently shows ALL groups including ones user is already in
+       - Backend should exclude user's groups from discovery list
+
+[ ] 26. Error Boundaries
+       - No error boundaries in the React Native app
+       - A crash in any screen crashes the whole app
+       - Add ErrorBoundary component wrapping main screens
+
+[ ] 27. Input Validation
+       - Client-side validation is minimal
+       - Add proper validation for: phone numbers, amounts, dates
+       - Show inline error messages
+
+
+================================================================================
+  NOTES
+================================================================================
+
+  Backend API Base: http://192.168.88.243:8000/api/v1/
+  Django Settings: core/settings.py
+  Mobile Entry: mobile/App.tsx
+  Key Models: user/models.py, chema/models.py, condolence/models.py, wallet/models.py
+  API Views: api_v1/views.py
+  Serializers: chema/serializers.py, user/serializers.py, condolence/serializers.py
+
+================================================================================

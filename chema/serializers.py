@@ -18,13 +18,14 @@ class GroupSerializer(serializers.ModelSerializer):
     is_admin = serializers.SerializerMethodField()
     is_selected = serializers.SerializerMethodField()
     unread_posts_count = serializers.SerializerMethodField()
+    membership_status = serializers.SerializerMethodField()
 
     class Meta:
         model = Group
         fields = [
             'id', 'name', 'is_active', 'description', 'cover_image', 
             'total_members', 'requires_approval', 'created_at', 'is_admin', 'balance',
-            'is_selected', 'unread_posts_count'
+            'is_selected', 'unread_posts_count', 'membership_status'
         ]
 
     def get_is_selected(self, obj):
@@ -62,6 +63,18 @@ class GroupSerializer(serializers.ModelSerializer):
             except Exception:
                 return 0
         return 0
+
+    def get_membership_status(self, obj):
+        """Returns 'active', 'pending', or null if user is not a member."""
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            try:
+                membership = GroupMembership.objects.filter(group=obj, member=request.user.profile).first()
+                if membership:
+                    return membership.status
+            except Exception:
+                pass
+        return None
 
 class PostImageSerializer(serializers.ModelSerializer):
     class Meta:

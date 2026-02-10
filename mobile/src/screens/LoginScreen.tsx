@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, SafeAreaView } from 'react-native';
-import client, { setAuthToken } from '../api/client';
+import client, { setAuthToken, saveToken } from '../api/client';
 
 interface LoginProps {
     onLoginSuccess: () => void;
@@ -27,6 +27,7 @@ const LoginScreen = ({ onLoginSuccess, onShowSignUp }: LoginProps) => {
 
             const token = response.data.token;
             setAuthToken(token);
+            await saveToken(token);
             onLoginSuccess();
         } catch (error: any) {
             console.error(error);

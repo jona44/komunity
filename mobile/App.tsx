@@ -1,5 +1,5 @@
 import React from 'react';
-import { View } from 'react-native';
+import { View, ActivityIndicator, Text, StyleSheet as RNStyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import LoginScreen from './src/screens/LoginScreen';
 import HomeScreen from './src/screens/HomeScreen';
@@ -20,12 +20,13 @@ import GroupSelectionScreen from './src/screens/GroupSelectionScreen';
 import CreateGroupScreen from './src/screens/CreateGroupScreen';
 import BottomNavBar from './src/components/BottomNavBar';
 import TopNavBar from './src/components/TopNavBar';
-import client, { setAuthToken } from './src/api/client';
+import client, { setAuthToken, loadToken, clearToken } from './src/api/client';
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = React.useState(false);
   const [isSigningUp, setIsSigningUp] = React.useState(false);
   const [needsProfileSetup, setNeedsProfileSetup] = React.useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = React.useState(true);
   const [userProfile, setUserProfile] = React.useState<any>(null);
   const [selectedGroup, setSelectedGroup] = React.useState<any>(null);
   const [selectedPost, setSelectedPost] = React.useState<any>(null);
@@ -40,6 +41,31 @@ export default function App() {
   const [isChoosingGroup, setIsChoosingGroup] = React.useState(false);
   const [isCreatingGroup, setIsCreatingGroup] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState<'home' | 'discovery' | 'wallet' | 'profile'>('home');
+
+  // Auto-login: try to restore session from secure storage on launch
+  React.useEffect(() => {
+    const tryAutoLogin = async () => {
+      try {
+        const token = await loadToken();
+        if (token) {
+          // Validate the token by fetching the profile
+          const response = await client.get('profiles/me/');
+          setUserProfile(response.data);
+          if (!response.data.is_complete) {
+            setNeedsProfileSetup(true);
+          }
+          setIsLoggedIn(true);
+        }
+      } catch (error) {
+        // Token is invalid or expired — clear it and show login
+        console.log('Auto-login failed, showing login screen');
+        await clearToken();
+      } finally {
+        setIsCheckingAuth(false);
+      }
+    };
+    tryAutoLogin();
+  }, []);
 
   const checkProfileStatus = async () => {
     try {
@@ -67,9 +93,9 @@ export default function App() {
     setIsSigningUp(false);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     console.log('App: Logging out...');
-    setAuthToken(null);
+    await clearToken();
     setIsLoggedIn(false);
     setActiveTab('home');
     setSelectedGroup(null);
@@ -83,7 +109,20 @@ export default function App() {
     setIsViewingAllMembers(null);
     setViewingGroupWallet(null);
     setNeedsProfileSetup(false);
+    setUserProfile(null);
   };
+
+  // Show loading screen while checking for stored token
+  if (isCheckingAuth) {
+    return (
+      <SafeAreaProvider>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#ffffff' }}>
+          <Text style={{ fontSize: 36, fontWeight: 'bold', color: '#2563eb', marginBottom: 16 }}>Komunity</Text>
+          <ActivityIndicator size="large" color="#2563eb" />
+        </View>
+      </SafeAreaProvider>
+    );
+  }
 
   if (!isLoggedIn) {
     if (isSigningUp) {

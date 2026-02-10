@@ -9,6 +9,7 @@ interface Group {
     cover_image: string | null;
     total_members: number;
     requires_approval: boolean;
+    membership_status: 'active' | 'pending' | null;
 }
 
 interface DiscoveryScreenProps {
@@ -27,8 +28,6 @@ const DiscoveryScreen = ({ onBack, onGroupJoined }: DiscoveryScreenProps) => {
 
     const fetchGroups = async () => {
         try {
-            // Fetch all active groups
-            // In a real app, you'd filter out groups the user is already in on the backend
             const response = await client.get('groups/');
             setGroups(response.data);
         } catch (error) {
@@ -74,6 +73,31 @@ const DiscoveryScreen = ({ onBack, onGroupJoined }: DiscoveryScreenProps) => {
         }
     };
 
+    const getButtonConfig = (group: Group) => {
+        if (group.membership_status === 'active') {
+            return {
+                label: '✓ Joined',
+                style: styles.joinedButton,
+                textStyle: styles.joinedButtonText,
+                disabled: true,
+            };
+        }
+        if (group.membership_status === 'pending') {
+            return {
+                label: '⏳ Pending Approval',
+                style: styles.pendingButton,
+                textStyle: styles.pendingButtonText,
+                disabled: true,
+            };
+        }
+        return {
+            label: group.requires_approval ? 'Request to Join' : 'Join Group',
+            style: styles.joinButton,
+            textStyle: styles.joinButtonText,
+            disabled: false,
+        };
+    };
+
     if (loading) {
         return (
             <View style={styles.centered}>
@@ -88,36 +112,37 @@ const DiscoveryScreen = ({ onBack, onGroupJoined }: DiscoveryScreenProps) => {
                 data={groups}
                 keyExtractor={(item) => item.id.toString()}
                 contentContainerStyle={styles.listContent}
-                renderItem={({ item }) => (
-                    <View style={styles.groupCard}>
-                        {item.cover_image ? (
-                            <Image source={{ uri: item.cover_image }} style={styles.coverImage} />
-                        ) : (
-                            <View style={[styles.coverImage, { backgroundColor: '#e5e7eb' }]} />
-                        )}
-                        <View style={styles.cardContent}>
-                            <Text style={styles.groupName}>{item.name}</Text>
-                            <Text style={styles.memberCount}>{item.total_members} members</Text>
-                            <Text style={styles.description} numberOfLines={3}>
-                                {item.description || 'Connecting community members together.'}
-                            </Text>
+                renderItem={({ item }) => {
+                    const btn = getButtonConfig(item);
+                    return (
+                        <View style={styles.groupCard}>
+                            {item.cover_image ? (
+                                <Image source={{ uri: item.cover_image }} style={styles.coverImage} />
+                            ) : (
+                                <View style={[styles.coverImage, { backgroundColor: '#e5e7eb' }]} />
+                            )}
+                            <View style={styles.cardContent}>
+                                <Text style={styles.groupName}>{item.name}</Text>
+                                <Text style={styles.memberCount}>{item.total_members} members</Text>
+                                <Text style={styles.description} numberOfLines={3}>
+                                    {item.description || 'Connecting community members together.'}
+                                </Text>
 
-                            <TouchableOpacity
-                                style={[styles.joinButton, joiningId === item.id && styles.buttonDisabled]}
-                                onPress={() => handleJoinGroup(item)}
-                                disabled={joiningId === item.id}
-                            >
-                                {joiningId === item.id ? (
-                                    <ActivityIndicator size="small" color="#ffffff" />
-                                ) : (
-                                    <Text style={styles.joinButtonText}>
-                                        {item.requires_approval ? 'Request to Join' : 'Join Group'}
-                                    </Text>
-                                )}
-                            </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[btn.style, joiningId === item.id && styles.buttonLoading]}
+                                    onPress={() => handleJoinGroup(item)}
+                                    disabled={btn.disabled || joiningId === item.id}
+                                >
+                                    {joiningId === item.id ? (
+                                        <ActivityIndicator size="small" color="#ffffff" />
+                                    ) : (
+                                        <Text style={btn.textStyle}>{btn.label}</Text>
+                                    )}
+                                </TouchableOpacity>
+                            </View>
                         </View>
-                    </View>
-                )}
+                    );
+                }}
                 ListEmptyComponent={
                     <View style={styles.emptyContainer}>
                         <Text style={styles.emptyText}>No new communities found at the moment.</Text>
@@ -206,19 +231,48 @@ const styles = StyleSheet.create({
         lineHeight: 20,
         marginBottom: 20,
     },
+    // Join button (default — not yet a member)
     joinButton: {
         backgroundColor: '#2563eb',
         paddingVertical: 12,
         borderRadius: 12,
         alignItems: 'center',
     },
-    buttonDisabled: {
-        backgroundColor: '#93c5fd',
-    },
     joinButtonText: {
         color: '#ffffff',
         fontWeight: 'bold',
         fontSize: 16,
+    },
+    // Already joined
+    joinedButton: {
+        backgroundColor: '#f0fdf4',
+        paddingVertical: 12,
+        borderRadius: 12,
+        alignItems: 'center',
+        borderWidth: 1.5,
+        borderColor: '#22c55e',
+    },
+    joinedButtonText: {
+        color: '#16a34a',
+        fontWeight: 'bold',
+        fontSize: 16,
+    },
+    // Pending approval
+    pendingButton: {
+        backgroundColor: '#fffbeb',
+        paddingVertical: 12,
+        borderRadius: 12,
+        alignItems: 'center',
+        borderWidth: 1.5,
+        borderColor: '#f59e0b',
+    },
+    pendingButtonText: {
+        color: '#d97706',
+        fontWeight: 'bold',
+        fontSize: 16,
+    },
+    buttonLoading: {
+        backgroundColor: '#93c5fd',
     },
     emptyContainer: {
         padding: 40,
