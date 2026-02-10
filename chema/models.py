@@ -137,6 +137,7 @@ class GroupMembership(models.Model):
     can_post    = models.BooleanField(default=True)
     can_comment = models.BooleanField(default=True)
     join_message = models.TextField(blank=True, help_text="Message when requesting to join")
+    last_viewed_at = models.DateTimeField(null=True, blank=True)
     
     def __str__(self):
         return f"{self.member.full_name} in {self.group.name}"

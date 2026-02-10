@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import {
     View, Text, StyleSheet, TextInput, TouchableOpacity,
     ScrollView, Alert, SafeAreaView, KeyboardAvoidingView,
-    Platform, ActivityIndicator, Pressable
+    Platform, ActivityIndicator, Pressable, Image
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import client from '../api/client';
@@ -24,6 +25,7 @@ const ProfileSetupScreen = ({ onComplete }: ProfileSetupProps) => {
     const [traditionalNames, setTraditionalNames] = useState('');
     const [spiritualBeliefs, setSpiritualBeliefs] = useState('');
     const [bio, setBio] = useState('');
+    const [profilePicture, setProfilePicture] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
 
     const onDateChange = (event: any, selectedDate?: Date) => {
@@ -41,6 +43,26 @@ const ProfileSetupScreen = ({ onComplete }: ProfileSetupProps) => {
         });
     };
 
+    const pickImage = async () => {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+        if (status !== 'granted') {
+            Alert.alert('Permission Needed', 'We need permission to access your gallery to set a profile picture.');
+            return;
+        }
+
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ['images'],
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.7,
+        });
+
+        if (!result.canceled) {
+            setProfilePicture(result.assets[0].uri);
+        }
+    };
+
     const handleSaveProfile = async () => {
         if (!firstName.trim() || !surname.trim()) {
             Alert.alert('Required Fields', 'Please enter at least your first name and surname.');
@@ -54,16 +76,33 @@ const ProfileSetupScreen = ({ onComplete }: ProfileSetupProps) => {
             const profileId = meResponse.data.id;
 
             // Updated profile
-            await client.patch(`profiles/${profileId}/`, {
-                first_name: firstName.trim(),
-                surname: surname.trim(),
-                phone: phone.trim(),
-                date_of_birth: dob ? dob.toISOString().split('T')[0] : null,
-                cultural_background: culturalBackground.trim(),
-                religious_affiliation: religiousAffiliation.trim(),
-                traditional_names: traditionalNames.trim(),
-                spiritual_beliefs: spiritualBeliefs.trim(),
-                bio: bio.trim(),
+            const formData = new FormData();
+            formData.append('first_name', firstName.trim());
+            formData.append('surname', surname.trim());
+            formData.append('phone', phone.trim());
+            if (dob) formData.append('date_of_birth', dob.toISOString().split('T')[0]);
+            formData.append('cultural_background', culturalBackground.trim());
+            formData.append('religious_affiliation', religiousAffiliation.trim());
+            formData.append('traditional_names', traditionalNames.trim());
+            formData.append('spiritual_beliefs', spiritualBeliefs.trim());
+            formData.append('bio', bio.trim());
+
+            if (profilePicture) {
+                const filename = profilePicture.split('/').pop();
+                const match = /\.(\w+)$/.exec(filename || '');
+                const type = match ? `image/${match[1]}` : `image`;
+
+                formData.append('profile_picture', {
+                    uri: profilePicture,
+                    name: filename || 'profile.jpg',
+                    type,
+                } as any);
+            }
+
+            await client.patch(`profiles/${profileId}/`, formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
             });
 
             Alert.alert('Welcome!', 'Your profile has been set up successfully.');
@@ -89,6 +128,21 @@ const ProfileSetupScreen = ({ onComplete }: ProfileSetupProps) => {
                     </View>
 
                     <View style={styles.form}>
+                        <View style={styles.avatarSection}>
+                            <TouchableOpacity onPress={pickImage} style={styles.avatarContainer}>
+                                {profilePicture ? (
+                                    <Image source={{ uri: profilePicture }} style={styles.avatar} />
+                                ) : (
+                                    <View style={styles.avatarPlaceholder}>
+                                        <Text style={styles.avatarLabel}>Add Photo</Text>
+                                    </View>
+                                )}
+                                <View style={styles.editBadge}>
+                                    <Text style={styles.editBadgeText}>+</Text>
+                                </View>
+                            </TouchableOpacity>
+                        </View>
+
                         <View style={styles.inputGroup}>
                             <Text style={styles.label}>First Name *</Text>
                             <TextInput
@@ -240,6 +294,55 @@ const styles = StyleSheet.create({
     },
     form: {
         flex: 1,
+    },
+    avatarSection: {
+        alignItems: 'center',
+        marginBottom: 32,
+    },
+    avatarContainer: {
+        position: 'relative',
+    },
+    avatar: {
+        width: 120,
+        height: 120,
+        borderRadius: 60,
+        borderWidth: 4,
+        borderColor: '#f3f4f6',
+    },
+    avatarPlaceholder: {
+        width: 120,
+        height: 120,
+        borderRadius: 60,
+        backgroundColor: '#f3f4f6',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: '#e5e7eb',
+        borderStyle: 'dashed',
+    },
+    avatarLabel: {
+        fontSize: 14,
+        color: '#6b7280',
+        fontWeight: '600',
+    },
+    editBadge: {
+        position: 'absolute',
+        bottom: 4,
+        right: 4,
+        backgroundColor: '#2563eb',
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 3,
+        borderColor: '#ffffff',
+    },
+    editBadgeText: {
+        color: '#ffffff',
+        fontSize: 20,
+        fontWeight: 'bold',
+        marginTop: -2,
     },
     inputGroup: {
         marginBottom: 20,

@@ -113,6 +113,13 @@ class GroupViewSet(viewsets.ModelViewSet):
         GroupMembership.objects.filter(member=profile).exclude(group=group).update(is_active=False)
         return Response({'status': 'selected'})
 
+    @action(detail=True, methods=['post'])
+    def mark_read(self, request, pk=None):
+        group = self.get_object()
+        profile = request.user.profile
+        GroupMembership.objects.filter(group=group, member=profile).update(last_viewed_at=timezone.now())
+        return Response({'status': 'marked_read'})
+
     @action(detail=True, methods=['get'])
     def members(self, request, pk=None):
         group = self.get_object()

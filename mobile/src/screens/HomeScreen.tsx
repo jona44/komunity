@@ -9,6 +9,7 @@ interface Group {
     cover_image: string | null;
     total_members: number;
     is_selected: boolean;
+    unread_posts_count: number;
 }
 
 interface HomeScreenProps {
@@ -98,9 +99,11 @@ const HomeScreen = ({ onSelectGroup, onViewGroupDetails, onViewWallet, onDiscove
                                     onPress={() => onSelectGroup(item)}
                                 >
                                     <Text style={styles.feedButtonText}>Discussion Feed</Text>
-                                    <View style={styles.notificationBadge}>
-                                        <Text style={styles.badgeText}>3</Text>
-                                    </View>
+                                    {item.unread_posts_count > 0 && (
+                                        <View style={styles.notificationBadge}>
+                                            <Text style={styles.badgeText}>{item.unread_posts_count}</Text>
+                                        </View>
+                                    )}
                                 </TouchableOpacity>
                             </View>
                         </View>

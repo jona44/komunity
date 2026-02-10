@@ -3,6 +3,7 @@ import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
     Image, ActivityIndicator, Alert, TextInput, Pressable, Platform
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import client from '../api/client';
@@ -31,6 +32,7 @@ const ProfileScreen = ({ onBack, onLogout, onProfileUpdate }: ProfileScreenProps
     const [traditionalNames, setTraditionalNames] = useState('');
     const [spiritualBeliefs, setSpiritualBeliefs] = useState('');
     const [bio, setBio] = useState('');
+    const [profilePicture, setProfilePicture] = useState<string | null>(null);
 
     useEffect(() => {
         fetchProfile();
@@ -58,6 +60,7 @@ const ProfileScreen = ({ onBack, onLogout, onProfileUpdate }: ProfileScreenProps
             setTraditionalNames(data.profile?.traditional_names || '');
             setSpiritualBeliefs(data.profile?.spiritual_beliefs || '');
             setBio(data.profile?.bio || '');
+            setProfilePicture(null); // Reset local selection
         } catch (error) {
             console.error('Error fetching profile:', error);
             Alert.alert('Error', 'Failed to load profile');
@@ -66,21 +69,58 @@ const ProfileScreen = ({ onBack, onLogout, onProfileUpdate }: ProfileScreenProps
         }
     };
 
+    const pickImage = async () => {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+        if (status !== 'granted') {
+            Alert.alert('Permission Needed', 'We need permission to access your gallery to change your profile picture.');
+            return;
+        }
+
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ['images'],
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.7,
+        });
+
+        if (!result.canceled) {
+            setProfilePicture(result.assets[0].uri);
+        }
+    };
+
     const handleSave = async () => {
         if (!profile?.profile?.id) return;
 
         setIsSaving(true);
         try {
-            const response = await client.patch(`profiles/${profile.profile.id}/`, {
-                first_name: firstName,
-                surname: surname,
-                phone: phone,
-                date_of_birth: dob ? dob.toISOString().split('T')[0] : null,
-                cultural_background: culturalBackground,
-                religious_affiliation: religiousAffiliation,
-                traditional_names: traditionalNames,
-                spiritual_beliefs: spiritualBeliefs,
-                bio: bio
+            const formData = new FormData();
+            formData.append('first_name', firstName);
+            formData.append('surname', surname);
+            formData.append('phone', phone);
+            if (dob) formData.append('date_of_birth', dob.toISOString().split('T')[0]);
+            formData.append('cultural_background', culturalBackground);
+            formData.append('religious_affiliation', religiousAffiliation);
+            formData.append('traditional_names', traditionalNames);
+            formData.append('spiritual_beliefs', spiritualBeliefs);
+            formData.append('bio', bio);
+
+            if (profilePicture) {
+                const filename = profilePicture.split('/').pop();
+                const match = /\.(\w+)$/.exec(filename || '');
+                const type = match ? `image/${match[1]}` : `image`;
+
+                formData.append('profile_picture', {
+                    uri: profilePicture,
+                    name: filename || 'profile.jpg',
+                    type,
+                } as any);
+            }
+
+            await client.patch(`profiles/${profile.profile.id}/`, formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
             });
 
             Alert.alert('Success', 'Profile updated successfully');
@@ -150,8 +190,17 @@ const ProfileScreen = ({ onBack, onLogout, onProfileUpdate }: ProfileScreenProps
             <ScrollView style={styles.content}>
                 {/* Profile Header */}
                 <View style={styles.profileHeader}>
-                    <View style={styles.avatarContainer}>
-                        {profile?.profile?.profile_picture ? (
+                    <TouchableOpacity
+                        style={styles.avatarContainer}
+                        onPress={isEditing ? pickImage : undefined}
+                        disabled={!isEditing}
+                    >
+                        {profilePicture ? (
+                            <Image
+                                source={{ uri: profilePicture }}
+                                style={styles.avatar}
+                            />
+                        ) : profile?.profile?.profile_picture ? (
                             <Image
                                 source={{ uri: profile.profile.profile_picture }}
                                 style={styles.avatar}
@@ -163,7 +212,12 @@ const ProfileScreen = ({ onBack, onLogout, onProfileUpdate }: ProfileScreenProps
                                 </Text>
                             </View>
                         )}
-                    </View>
+                        {isEditing && (
+                            <View style={styles.editBadge}>
+                                <Text style={styles.editBadgeText}>✎</Text>
+                            </View>
+                        )}
+                    </TouchableOpacity>
                     <Text style={styles.profileName}>
                         {isEditing ? `${firstName} ${surname}`.trim() || 'New User' : profile?.profile?.full_name || 'No name set'}
                     </Text>
@@ -433,6 +487,7 @@ const styles = StyleSheet.create({
     },
     avatarContainer: {
         marginBottom: 16,
+        position: 'relative',
     },
     avatar: {
         width: 100,
@@ -453,6 +508,24 @@ const styles = StyleSheet.create({
         fontSize: 40,
         fontWeight: 'bold',
         color: '#2563eb',
+    },
+    editBadge: {
+        position: 'absolute',
+        bottom: 0,
+        right: 0,
+        backgroundColor: '#2563eb',
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 3,
+        borderColor: '#ffffff',
+    },
+    editBadgeText: {
+        color: '#ffffff',
+        fontSize: 14,
+        fontWeight: 'bold',
     },
     profileName: {
         fontSize: 24,

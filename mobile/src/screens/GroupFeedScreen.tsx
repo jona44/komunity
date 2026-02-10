@@ -67,7 +67,16 @@ const GroupFeedScreen = ({ group, onBack, onSelectPost, onCreatePost }: GroupFee
 
     useEffect(() => {
         fetchPosts();
+        markAsRead();
     }, []);
+
+    const markAsRead = async () => {
+        try {
+            await client.post(`groups/${group.id}/mark_read/`);
+        } catch (error) {
+            console.error('Error marking group as read:', error);
+        }
+    };
 
     const fetchPosts = async () => {
         try {

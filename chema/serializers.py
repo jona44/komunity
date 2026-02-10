@@ -17,13 +17,14 @@ class GroupSerializer(serializers.ModelSerializer):
     balance = serializers.DecimalField(source='get_balance', max_digits=10, decimal_places=2, read_only=True)
     is_admin = serializers.SerializerMethodField()
     is_selected = serializers.SerializerMethodField()
+    unread_posts_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Group
         fields = [
             'id', 'name', 'is_active', 'description', 'cover_image', 
             'total_members', 'requires_approval', 'created_at', 'is_admin', 'balance',
-            'is_selected'
+            'is_selected', 'unread_posts_count'
         ]
 
     def get_is_selected(self, obj):
@@ -41,6 +42,26 @@ class GroupSerializer(serializers.ModelSerializer):
         if request and request.user:
             return obj.is_admin(request.user)
         return False
+
+    def get_unread_posts_count(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            try:
+                membership = GroupMembership.objects.filter(group=obj, member=request.user.profile).first()
+                if not membership:
+                    return 0
+                
+                query = Post.objects.filter(group=obj, approved=True)
+                if membership.last_viewed_at:
+                    query = query.filter(created_at__gt=membership.last_viewed_at)
+                
+                # Exclude own posts from unread count? Usually yes.
+                query = query.exclude(author=request.user.profile)
+                
+                return query.count()
+            except Exception:
+                return 0
+        return 0
 
 class PostImageSerializer(serializers.ModelSerializer):
     class Meta:
