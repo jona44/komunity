@@ -58,15 +58,7 @@ const MemberProfileScreen = ({ membership, isAdmin, onBack, onStatusChange }: Me
     );
 
     return (
-        <View style={[styles.container, { paddingTop: insets.top }]}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={onBack} style={styles.backButton}>
-                    <Text style={styles.backButtonText}>←</Text>
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Member Profile</Text>
-                <View style={{ width: 40 }} />
-            </View>
-
+        <View style={styles.container}>
             <ScrollView showsVerticalScrollIndicator={false}>
                 <View style={styles.profileHero}>
                     <View style={styles.avatarContainer}>

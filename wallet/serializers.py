@@ -5,6 +5,7 @@ from chema.serializers import GroupSerializer
 class TransactionSerializer(serializers.ModelSerializer):
     destination_group_detail = GroupSerializer(source='destination_group', read_only=True)
     recipient_wallet_detail = serializers.SerializerMethodField()
+    wallet_detail = serializers.SerializerMethodField()
 
     class Meta:
         model = Transaction
@@ -12,9 +13,18 @@ class TransactionSerializer(serializers.ModelSerializer):
             'id', 'wallet', 'transaction_type', 'amount', 'status', 
             'destination_group', 'destination_group_detail', 
             'recipient_wallet', 'recipient_wallet_detail',
+            'wallet_detail',
             'deceased_contribution', 'voucher_reference', 
             'waas_reference_id', 'timestamp'
         ]
+    
+    def get_wallet_detail(self, obj):
+        user = obj.wallet.user
+        return {
+            'user_id': user.id,
+            'user_email': user.email,
+            'full_name': user.profile.full_name if hasattr(user, 'profile') else user.email
+        }
     
     def get_recipient_wallet_detail(self, obj):
         if obj.recipient_wallet:

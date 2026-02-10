@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import {
     View, Text, StyleSheet, TextInput, TouchableOpacity,
     ScrollView, Alert, SafeAreaView, KeyboardAvoidingView,
-    Platform, ActivityIndicator
+    Platform, ActivityIndicator, Pressable
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import client from '../api/client';
 
@@ -16,8 +17,29 @@ const ProfileSetupScreen = ({ onComplete }: ProfileSetupProps) => {
     const [firstName, setFirstName] = useState('');
     const [surname, setSurname] = useState('');
     const [phone, setPhone] = useState('');
+    const [dob, setDob] = useState<Date | null>(null);
+    const [showDatePicker, setShowDatePicker] = useState(false);
+    const [culturalBackground, setCulturalBackground] = useState('');
+    const [religiousAffiliation, setReligiousAffiliation] = useState('');
+    const [traditionalNames, setTraditionalNames] = useState('');
+    const [spiritualBeliefs, setSpiritualBeliefs] = useState('');
     const [bio, setBio] = useState('');
     const [loading, setLoading] = useState(false);
+
+    const onDateChange = (event: any, selectedDate?: Date) => {
+        setShowDatePicker(false);
+        if (selectedDate) {
+            setDob(selectedDate);
+        }
+    };
+
+    const formatDate = (date: Date) => {
+        return date.toLocaleDateString('en-GB', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric'
+        });
+    };
 
     const handleSaveProfile = async () => {
         if (!firstName.trim() || !surname.trim()) {
@@ -36,6 +58,11 @@ const ProfileSetupScreen = ({ onComplete }: ProfileSetupProps) => {
                 first_name: firstName.trim(),
                 surname: surname.trim(),
                 phone: phone.trim(),
+                date_of_birth: dob ? dob.toISOString().split('T')[0] : null,
+                cultural_background: culturalBackground.trim(),
+                religious_affiliation: religiousAffiliation.trim(),
+                traditional_names: traditionalNames.trim(),
+                spiritual_beliefs: spiritualBeliefs.trim(),
                 bio: bio.trim(),
             });
 
@@ -83,6 +110,27 @@ const ProfileSetupScreen = ({ onComplete }: ProfileSetupProps) => {
                         </View>
 
                         <View style={styles.inputGroup}>
+                            <Text style={styles.label}>Date of Birth</Text>
+                            <Pressable
+                                style={styles.input}
+                                onPress={() => setShowDatePicker(true)}
+                            >
+                                <Text style={[styles.dateText, !dob && styles.placeholderText]}>
+                                    {dob ? formatDate(dob) : "Select your birth date"}
+                                </Text>
+                            </Pressable>
+                            {showDatePicker && (
+                                <DateTimePicker
+                                    value={dob || new Date(2000, 0, 1)}
+                                    mode="date"
+                                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                                    onChange={onDateChange}
+                                    maximumDate={new Date()}
+                                />
+                            )}
+                        </View>
+
+                        <View style={styles.inputGroup}>
                             <Text style={styles.label}>Phone Number</Text>
                             <TextInput
                                 style={styles.input}
@@ -90,6 +138,50 @@ const ProfileSetupScreen = ({ onComplete }: ProfileSetupProps) => {
                                 value={phone}
                                 onChangeText={setPhone}
                                 keyboardType="phone-pad"
+                            />
+                        </View>
+
+                        <View style={styles.sectionHeader}>
+                            <Text style={styles.sectionTitle}>Cultural & Religious (Optional)</Text>
+                        </View>
+
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.label}>Cultural Background</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="e.g. Zulu, Yoruba, etc."
+                                value={culturalBackground}
+                                onChangeText={setCulturalBackground}
+                            />
+                        </View>
+
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.label}>Religious Affiliation</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="e.g. Christian, Muslim, etc."
+                                value={religiousAffiliation}
+                                onChangeText={setReligiousAffiliation}
+                            />
+                        </View>
+
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.label}>Traditional/Clan Names</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Names used in your tradition"
+                                value={traditionalNames}
+                                onChangeText={setTraditionalNames}
+                            />
+                        </View>
+
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.label}>Spiritual Beliefs</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Any specific beliefs or practices"
+                                value={spiritualBeliefs}
+                                onChangeText={setSpiritualBeliefs}
                             />
                         </View>
 
@@ -158,6 +250,18 @@ const styles = StyleSheet.create({
         color: '#374151',
         marginBottom: 8,
     },
+    sectionHeader: {
+        marginTop: 12,
+        marginBottom: 16,
+        paddingBottom: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f3f4f6',
+    },
+    sectionTitle: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#2563eb',
+    },
     input: {
         backgroundColor: '#f9fafb',
         borderWidth: 1,
@@ -166,6 +270,14 @@ const styles = StyleSheet.create({
         padding: 14,
         fontSize: 16,
         color: '#111827',
+        justifyContent: 'center',
+    },
+    dateText: {
+        fontSize: 16,
+        color: '#111827',
+    },
+    placeholderText: {
+        color: '#9ca3af',
     },
     textArea: {
         height: 120,

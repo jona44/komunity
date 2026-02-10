@@ -102,25 +102,7 @@ const CreatePostScreen = ({ group, onBack, onPostCreated }: CreatePostProps) => 
     };
 
     return (
-        <View style={[styles.container, { paddingTop: insets.top }]}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={onBack} style={styles.closeButton}>
-                    <Text style={styles.closeButtonText}>✕</Text>
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Create Post</Text>
-                <TouchableOpacity
-                    onPress={handleCreatePost}
-                    disabled={loading || (!content.trim() && images.length === 0)}
-                    style={[styles.postButton, (loading || (!content.trim() && images.length === 0)) && { opacity: 0.5 }]}
-                >
-                    {loading ? (
-                        <ActivityIndicator size="small" color="#ffffff" />
-                    ) : (
-                        <Text style={styles.postButtonText}>Post</Text>
-                    )}
-                </TouchableOpacity>
-            </View>
-
+        <View style={styles.container}>
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                 style={{ flex: 1 }}
@@ -159,17 +141,28 @@ const CreatePostScreen = ({ group, onBack, onPostCreated }: CreatePostProps) => 
                 </ScrollView>
 
                 <View style={[styles.toolbar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
-                    <TouchableOpacity style={styles.toolbarItem} onPress={pickImage}>
-                        <Text style={styles.toolbarIcon}>🖼️</Text>
-                        <Text style={styles.toolbarLabel}>Photos</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.toolbarItem}>
-                        <Text style={styles.toolbarIcon}>📍</Text>
-                        <Text style={styles.toolbarLabel}>Location</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.toolbarItem}>
-                        <Text style={styles.toolbarIcon}>🏷️</Text>
-                        <Text style={styles.toolbarLabel}>Tag</Text>
+                    <View style={styles.toolbarLeft}>
+                        <TouchableOpacity style={styles.toolbarItem} onPress={pickImage}>
+                            <Text style={styles.toolbarIcon}>🖼️</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.toolbarItem}>
+                            <Text style={styles.toolbarIcon}>📍</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.toolbarItem}>
+                            <Text style={styles.toolbarIcon}>🏷️</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    <TouchableOpacity
+                        onPress={handleCreatePost}
+                        disabled={loading || (!content.trim() && images.length === 0)}
+                        style={[styles.postButton, (loading || (!content.trim() && images.length === 0)) && { opacity: 0.5 }]}
+                    >
+                        {loading ? (
+                            <ActivityIndicator size="small" color="#ffffff" />
+                        ) : (
+                            <Text style={styles.postButtonText}>Post Proposal</Text>
+                        )}
                     </TouchableOpacity>
                 </View>
             </KeyboardAvoidingView>
@@ -282,16 +275,22 @@ const styles = StyleSheet.create({
     },
     toolbar: {
         flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
         paddingHorizontal: 16,
         paddingTop: 12,
         borderTopWidth: 1,
         borderTopColor: '#f3f4f6',
         backgroundColor: '#ffffff',
     },
+    toolbarLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
     toolbarItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginRight: 24,
+        marginRight: 20,
         paddingVertical: 8,
     },
     toolbarIcon: {

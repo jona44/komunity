@@ -234,20 +234,12 @@ const PostDetailScreen = ({ post, onBack }: PostDetailProps) => {
     );
 
     return (
-        <View style={[styles.container, { paddingTop: insets.top }]}>
+        <View style={styles.container}>
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 25}
                 style={{ flex: 1 }}
             >
-                <View style={styles.header}>
-                    <TouchableOpacity onPress={onBack} style={styles.backButton}>
-                        <Text style={styles.backButtonText}>←</Text>
-                    </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Post Details</Text>
-                    <View style={{ width: 40 }} />
-                </View>
-
                 {loading ? (
                     <View style={styles.centered}>
                         <ActivityIndicator size="large" color="#2563eb" />
@@ -349,7 +341,7 @@ const PostDetailScreen = ({ post, onBack }: PostDetailProps) => {
                     </TouchableOpacity>
                 </View>
             </KeyboardAvoidingView>
-        </View>
+        </View >
     );
 };
 

@@ -56,16 +56,7 @@ const HomeScreen = ({ onSelectGroup, onViewGroupDetails, onViewWallet, onDiscove
     }
 
     return (
-        <SafeAreaView style={styles.container}>
-            <View style={styles.headerContainer}>
-                <View>
-                    <Text style={styles.headerTitle}>My Groups</Text>
-                    <TouchableOpacity onPress={onDiscover}>
-                        <Text style={styles.discoverLink}>+ Discover Communities</Text>
-                    </TouchableOpacity>
-                </View>
-
-            </View>
+        <View style={styles.container}>
             <FlatList
                 data={groups}
                 keyExtractor={(item) => item.id.toString()}
@@ -121,7 +112,7 @@ const HomeScreen = ({ onSelectGroup, onViewGroupDetails, onViewWallet, onDiscove
                     </View>
                 }
             />
-        </SafeAreaView>
+        </View>
     );
 };
 

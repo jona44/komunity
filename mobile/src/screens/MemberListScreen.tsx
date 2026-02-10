@@ -80,15 +80,7 @@ const MemberListScreen = ({ group, onBack, onSelectMember }: MemberListProps) =>
     );
 
     return (
-        <View style={[styles.container, { paddingTop: insets.top }]}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={onBack} style={styles.backButton}>
-                    <Text style={styles.backButtonText}>←</Text>
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>All Members</Text>
-                <View style={{ width: 40 }} />
-            </View>
-
+        <View style={styles.container}>
             <View style={styles.subHeader}>
                 <Text style={styles.groupName}>{group.name}</Text>
                 <Text style={styles.memberCount}>{members.length} members sharing this community</Text>

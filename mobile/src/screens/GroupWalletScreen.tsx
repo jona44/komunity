@@ -14,6 +14,7 @@ interface Transaction {
     timestamp: string;
     wallet_detail?: {
         user_email: string;
+        full_name?: string;
     };
 }
 
@@ -97,15 +98,7 @@ const GroupWalletScreen = ({ group, onBack }: GroupWalletScreenProps) => {
     }
 
     return (
-        <View style={[styles.container, { paddingTop: insets.top }]}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={onBack} style={styles.backButton}>
-                    <Text style={styles.backButtonText}>←</Text>
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Community Fund</Text>
-                <View style={{ width: 40 }} />
-            </View>
-
+        <View style={styles.container}>
             <ScrollView
                 style={styles.content}
                 refreshControl={
@@ -148,7 +141,7 @@ const GroupWalletScreen = ({ group, onBack }: GroupWalletScreenProps) => {
                                 </View>
                                 <View style={styles.itemFooter}>
                                     <Text style={styles.itemUser}>
-                                        {item.wallet_detail?.user_email || 'Member'}
+                                        {item.wallet_detail?.full_name || item.wallet_detail?.user_email || 'Member'}
                                     </Text>
                                     <Text style={styles.itemDate}>{formatDate(item.timestamp)}</Text>
                                 </View>

@@ -97,14 +97,6 @@ const GroupDetailScreen = ({ group, onBack, onViewFeed, onManage, onSelectMember
 
     return (
         <View style={[styles.container, { paddingTop: insets.top }]}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={onBack} style={styles.backButton}>
-                    <Text style={styles.backButtonText}>←</Text>
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>About Group</Text>
-                <View style={{ width: 40 }} />
-            </View>
-
             <ScrollView showsVerticalScrollIndicator={false}>
                 <View style={styles.heroSection}>
                     {group.cover_image ? (

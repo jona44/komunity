@@ -95,15 +95,7 @@ const GroupFeedScreen = ({ group, onBack, onSelectPost, onCreatePost }: GroupFee
     }
 
     return (
-        <View style={[styles.container, { paddingTop: insets.top }]}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={onBack} style={styles.backButton} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                    <Text style={styles.backButtonText}>←</Text>
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>{group.name}</Text>
-                <View style={{ width: 40 }} />
-            </View>
-
+        <View style={[styles.container]}>
             <FlatList
                 data={posts}
                 keyExtractor={(item) => item.id.toString()}

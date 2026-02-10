@@ -8,8 +8,8 @@ SECRET_KEY = 'django-insecure-l1u#8qmj&mfygs(0exmn%#-=jr8!$5gt5&_7)w@z8wf*ep%!(m
 
 DEBUG = True
 
-ALLOWED_HOSTS = ['chemaonline.azurewebsites.net','127.0.0.1','chema.com','localhost:8000','chemaonline.azurewebsites.net', '192.168.88.245']
-CSRF_TRUSTED_ORIGINS = ['https://chemaonline.azurewebsites.net','https://127.0.0.1','https://chema.com', 'http://192.168.88.245:8000']
+ALLOWED_HOSTS = ['chemaonline.azurewebsites.net','127.0.0.1','chema.com','localhost:8000','chemaonline.azurewebsites.net', '192.168.88.245', '192.168.88.243']
+CSRF_TRUSTED_ORIGINS = ['https://chemaonline.azurewebsites.net','https://127.0.0.1','https://chema.com', 'http://192.168.88.245:8000', 'http://192.168.88.243:8000']
 
 
 INSTALLED_APPS = [

@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://192.168.88.245:8000/api/v1/'; // Use machine IP for mobile devices
+const API_BASE_URL = 'http://192.168.88.243:8000/api/v1/'; // Use machine IP for mobile devices
 
 const client = axios.create({
     baseURL: API_BASE_URL,

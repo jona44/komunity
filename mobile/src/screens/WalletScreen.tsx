@@ -20,6 +20,11 @@ interface Transaction {
         user_id: number;
         full_name: string;
     };
+    wallet_detail?: {
+        user_id: number;
+        user_email: string;
+        full_name?: string;
+    };
 }
 
 const WalletScreen = ({ onBack }: { onBack: () => void }) => {
@@ -316,6 +321,9 @@ const WalletScreen = ({ onBack }: { onBack: () => void }) => {
                                 )}
                                 {item.recipient_wallet_detail && (
                                     <Text style={styles.destinationText}>To: {item.recipient_wallet_detail.full_name}</Text>
+                                )}
+                                {item.transaction_type === 'P2P_RECEIVED' && item.wallet_detail && (
+                                    <Text style={styles.destinationText}>From: {item.wallet_detail.full_name || item.wallet_detail.user_email}</Text>
                                 )}
                                 <Text style={styles.transactionDate}>{formatDate(item.timestamp)}</Text>
                             </View>

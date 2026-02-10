@@ -306,14 +306,6 @@ const GroupManagementScreen = ({ group, onBack, onSelectMember, onViewWallet }: 
 
     return (
         <View style={[styles.container, { paddingTop: insets.top }]}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={onBack} style={styles.backButton}>
-                    <Text style={styles.backButtonText}>←</Text>
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Group Management</Text>
-                <View style={{ width: 40 }} />
-            </View>
-
             <View style={styles.subHeader}>
                 <Text style={styles.groupName}>{group.name}</Text>
 

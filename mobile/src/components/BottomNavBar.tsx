@@ -5,14 +5,25 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 interface BottomNavBarProps {
     activeTab: 'home' | 'discovery' | 'wallet' | 'profile';
     onTabPress: (tab: 'home' | 'discovery' | 'wallet' | 'profile') => void;
+    onBack?: () => void;
     profilePicture?: string | null;
 }
 
-const BottomNavBar = ({ activeTab, onTabPress, profilePicture }: BottomNavBarProps) => {
+const BottomNavBar = ({ activeTab, onTabPress, onBack, profilePicture }: BottomNavBarProps) => {
     const insets = useSafeAreaInsets();
 
     return (
         <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+            {onBack && (
+                <TouchableOpacity
+                    style={styles.navItem}
+                    onPress={onBack}
+                >
+                    <Text style={styles.backIcon}>←</Text>
+                    <Text style={styles.navText}>Back</Text>
+                </TouchableOpacity>
+            )}
+
             <TouchableOpacity
                 style={styles.navItem}
                 onPress={() => onTabPress('home')}
@@ -81,6 +92,12 @@ const styles = StyleSheet.create({
         fontSize: 22,
         marginBottom: 4,
         opacity: 0.5,
+    },
+    backIcon: {
+        fontSize: 22,
+        marginBottom: 4,
+        color: '#2563eb',
+        fontWeight: 'bold',
     },
     activeIcon: {
         opacity: 1,

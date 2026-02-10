@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
+    "@react-native-community/datetimepicker": "8.4.4",
     "axios": "^1.13.4",
     "expo": "~54.0.33",
     "expo-image-picker": "^17.0.10",

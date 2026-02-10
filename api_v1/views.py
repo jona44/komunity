@@ -61,6 +61,17 @@ class GroupViewSet(viewsets.ModelViewSet):
     queryset = Group.objects.all()
     serializer_class = GroupSerializer
 
+    def perform_create(self, serializer):
+        group = serializer.save(creator=self.request.user)
+        # Automatically add the creator as an active admin member
+        GroupMembership.objects.create(
+            group=group,
+            member=self.request.user.profile,
+            is_admin=True,
+            role='admin',
+            status='active'
+        )
+
     def get_queryset(self):
         queryset = Group.objects.filter(is_active=True)
         # For Discovery, we might want to exclude groups user is already in

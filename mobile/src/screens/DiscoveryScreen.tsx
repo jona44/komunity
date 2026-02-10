@@ -83,15 +83,7 @@ const DiscoveryScreen = ({ onBack, onGroupJoined }: DiscoveryScreenProps) => {
     }
 
     return (
-        <SafeAreaView style={styles.container}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={onBack} style={styles.backButton}>
-                    <Text style={styles.backButtonText}>←</Text>
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Discover Communities</Text>
-                <View style={{ width: 40 }} />
-            </View>
-
+        <View style={styles.container}>
             <FlatList
                 data={groups}
                 keyExtractor={(item) => item.id.toString()}
@@ -132,7 +124,7 @@ const DiscoveryScreen = ({ onBack, onGroupJoined }: DiscoveryScreenProps) => {
                     </View>
                 }
             />
-        </SafeAreaView>
+        </View>
     );
 };
 

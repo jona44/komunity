@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
-    Image, ActivityIndicator, Alert, TextInput
+    Image, ActivityIndicator, Alert, TextInput, Pressable, Platform
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import client from '../api/client';
 
@@ -23,10 +24,12 @@ const ProfileScreen = ({ onBack, onLogout, onProfileUpdate }: ProfileScreenProps
     const [firstName, setFirstName] = useState('');
     const [surname, setSurname] = useState('');
     const [phone, setPhone] = useState('');
-    const [dob, setDob] = useState('');
+    const [dob, setDob] = useState<Date | null>(null);
+    const [showDatePicker, setShowDatePicker] = useState(false);
     const [culturalBackground, setCulturalBackground] = useState('');
     const [religiousAffiliation, setReligiousAffiliation] = useState('');
     const [traditionalNames, setTraditionalNames] = useState('');
+    const [spiritualBeliefs, setSpiritualBeliefs] = useState('');
     const [bio, setBio] = useState('');
 
     useEffect(() => {
@@ -43,10 +46,17 @@ const ProfileScreen = ({ onBack, onLogout, onProfileUpdate }: ProfileScreenProps
             setFirstName(data.profile?.first_name || '');
             setSurname(data.profile?.surname || '');
             setPhone(data.profile?.phone || '');
-            setDob(data.profile?.date_of_birth || '');
+
+            if (data.profile?.date_of_birth) {
+                setDob(new Date(data.profile.date_of_birth));
+            } else {
+                setDob(null);
+            }
+
             setCulturalBackground(data.profile?.cultural_background || '');
             setReligiousAffiliation(data.profile?.religious_affiliation || '');
             setTraditionalNames(data.profile?.traditional_names || '');
+            setSpiritualBeliefs(data.profile?.spiritual_beliefs || '');
             setBio(data.profile?.bio || '');
         } catch (error) {
             console.error('Error fetching profile:', error);
@@ -65,10 +75,11 @@ const ProfileScreen = ({ onBack, onLogout, onProfileUpdate }: ProfileScreenProps
                 first_name: firstName,
                 surname: surname,
                 phone: phone,
-                date_of_birth: dob || null,
+                date_of_birth: dob ? dob.toISOString().split('T')[0] : null,
                 cultural_background: culturalBackground,
                 religious_affiliation: religiousAffiliation,
                 traditional_names: traditionalNames,
+                spiritual_beliefs: spiritualBeliefs,
                 bio: bio
             });
 
@@ -101,6 +112,21 @@ const ProfileScreen = ({ onBack, onLogout, onProfileUpdate }: ProfileScreenProps
                 }
             ]
         );
+    };
+
+    const onDateChange = (event: any, selectedDate?: Date) => {
+        setShowDatePicker(false);
+        if (selectedDate) {
+            setDob(selectedDate);
+        }
+    };
+
+    const formatDateDisplay = (date: Date) => {
+        return date.toLocaleDateString('en-GB', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric'
+        });
     };
 
     if (loading) {
@@ -200,16 +226,27 @@ const ProfileScreen = ({ onBack, onLogout, onProfileUpdate }: ProfileScreenProps
                     <View style={styles.infoRow}>
                         <Text style={styles.infoLabel}>Date of Birth</Text>
                         {isEditing ? (
-                            <TextInput
-                                style={styles.editInput}
-                                value={dob}
-                                onChangeText={setDob}
-                                placeholder="YYYY-MM-DD"
-                            />
+                            <Pressable
+                                style={styles.datePickerButton}
+                                onPress={() => setShowDatePicker(true)}
+                            >
+                                <Text style={styles.editInput}>
+                                    {dob ? formatDateDisplay(dob) : 'Select Date'}
+                                </Text>
+                            </Pressable>
                         ) : (
                             <Text style={styles.infoValue}>
-                                {profile?.profile?.date_of_birth || 'Not set'}
+                                {dob ? formatDateDisplay(dob) : 'Not set'}
                             </Text>
+                        )}
+                        {showDatePicker && (
+                            <DateTimePicker
+                                value={dob || new Date(2000, 0, 1)}
+                                mode="date"
+                                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                                onChange={onDateChange}
+                                maximumDate={new Date()}
+                            />
                         )}
                     </View>
                 </View>
@@ -262,6 +299,22 @@ const ProfileScreen = ({ onBack, onLogout, onProfileUpdate }: ProfileScreenProps
                         ) : (
                             <Text style={styles.infoValue}>
                                 {profile?.profile?.traditional_names || 'Not set'}
+                            </Text>
+                        )}
+                    </View>
+
+                    <View style={styles.infoRow}>
+                        <Text style={styles.infoLabel}>Spiritual Beliefs</Text>
+                        {isEditing ? (
+                            <TextInput
+                                style={styles.editInput}
+                                value={spiritualBeliefs}
+                                onChangeText={setSpiritualBeliefs}
+                                placeholder="Spiritual Beliefs"
+                            />
+                        ) : (
+                            <Text style={styles.infoValue}>
+                                {profile?.profile?.spiritual_beliefs || 'Not set'}
                             </Text>
                         )}
                     </View>
@@ -488,6 +541,10 @@ const styles = StyleSheet.create({
         marginLeft: 0,
         marginTop: 8,
         minHeight: 80,
+    },
+    datePickerButton: {
+        flex: 1,
+        marginLeft: 16,
     },
     cancelButton: {
         backgroundColor: '#ffffff',
