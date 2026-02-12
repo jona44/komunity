@@ -35,3 +35,10 @@ class SignupSerializer(serializers.ModelSerializer):
         user.is_active = True # Activating by default for mobile API for now
         user.save()
         return user
+
+from .models import DeviceToken
+
+class DeviceTokenSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DeviceToken
+        fields = ['token', 'platform']

@@ -44,8 +44,38 @@ const ProfileSetupScreen = ({ onComplete }: ProfileSetupProps) => {
     };
 
     const pickImage = async () => {
-        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        Alert.alert(
+            'Profile Picture',
+            'Choose a source for your profile photo',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Take Photo', onPress: handleCameraLaunch },
+                { text: 'Choose from Gallery', onPress: handleGalleryLaunch },
+            ]
+        );
+    };
 
+    const handleCameraLaunch = async () => {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== 'granted') {
+            Alert.alert('Permission Needed', 'We need permission to use your camera to take a profile picture.');
+            return;
+        }
+
+        const result = await ImagePicker.launchCameraAsync({
+            mediaTypes: ['images'],
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.7,
+        });
+
+        if (!result.canceled) {
+            setProfilePicture(result.assets[0].uri);
+        }
+    };
+
+    const handleGalleryLaunch = async () => {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== 'granted') {
             Alert.alert('Permission Needed', 'We need permission to access your gallery to set a profile picture.');
             return;

@@ -1,6 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, Image, ActivityIndicator, TouchableOpacity, SafeAreaView } from 'react-native';
+import { View, Text, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, RefreshControl } from 'react-native';
+import { Image } from 'expo-image';
 import client from '../api/client';
+import { usePushNotifications } from '../hooks/usePushNotifications';
+import SearchScreen from './SearchScreen';
+import { GroupPlaceholder } from '../components/Loaders';
 
 interface Group {
     id: number;
@@ -22,10 +26,28 @@ interface HomeScreenProps {
 const HomeScreen = ({ onSelectGroup, onViewGroupDetails, onViewWallet, onDiscover }: HomeScreenProps) => {
     const [groups, setGroups] = useState<Group[]>([]);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+    const { registerToken } = usePushNotifications();
+    const [searchVisible, setSearchVisible] = useState(false);
 
     useEffect(() => {
         fetchGroups();
+        registerToken();
     }, []);
+
+    if (searchVisible) {
+        return (
+            <SearchScreen
+                onClose={() => setSearchVisible(false)}
+                onSelectGroup={(group) => {
+                    setSearchVisible(false);
+                    // Search result group might miss some fields like is_selected/unread_posts_count
+                    // but onViewGroupDetails handles it fine usually or we fetch details later.
+                    onViewGroupDetails?.(group as any);
+                }}
+            />
+        );
+    }
 
     const fetchGroups = async () => {
         try {
@@ -35,7 +57,13 @@ const HomeScreen = ({ onSelectGroup, onViewGroupDetails, onViewWallet, onDiscove
             console.error('Error fetching groups:', error);
         } finally {
             setLoading(false);
+            setRefreshing(false);
         }
+    };
+
+    const onRefresh = () => {
+        setRefreshing(true);
+        fetchGroups();
     };
 
     const handleSelectGroup = async (groupId: number) => {
@@ -50,25 +78,49 @@ const HomeScreen = ({ onSelectGroup, onViewGroupDetails, onViewWallet, onDiscove
 
     if (loading) {
         return (
-            <View style={styles.centered}>
-                <ActivityIndicator size="large" color="#2563eb" />
+            <View style={styles.container}>
+                <View style={styles.headerRow}>
+                    <Text style={styles.headerTitle}>My Groups</Text>
+                    <View style={styles.searchButton}>
+                        <Text style={{ fontSize: 22, opacity: 0.3 }}>🔍</Text>
+                    </View>
+                </View>
+                <GroupPlaceholder />
             </View>
         );
     }
 
     return (
         <View style={styles.container}>
+            <View style={styles.headerRow}>
+                <Text style={styles.headerTitle}>My Groups</Text>
+                <TouchableOpacity onPress={() => setSearchVisible(true)} style={styles.searchButton}>
+                    <Text style={{ fontSize: 22 }}>🔍</Text>
+                </TouchableOpacity>
+            </View>
             <FlatList
                 data={groups}
                 keyExtractor={(item) => item.id.toString()}
                 contentContainerStyle={styles.listContent}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        colors={['#2563eb']} // Android
+                        tintColor="#2563eb" // iOS
+                    />
+                }
                 renderItem={({ item }) => (
                     <TouchableOpacity
                         style={styles.groupCard}
                         onPress={() => onViewGroupDetails?.(item)}
                     >
                         {item.cover_image ? (
-                            <Image source={{ uri: item.cover_image }} style={styles.coverImage} />
+                            <Image
+                                source={{ uri: item.cover_image }}
+                                style={styles.coverImage}
+                                transition={200}
+                            />
                         ) : (
                             <View style={[styles.coverImage, { backgroundColor: '#e5e7eb' }]} />
                         )}
@@ -123,6 +175,20 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#f9fafb',
+    },
+    headerRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingTop: 50, // Safe area
+        paddingBottom: 10,
+        backgroundColor: '#ffffff',
+        borderBottomWidth: 1,
+        borderBottomColor: '#e5e7eb',
+    },
+    searchButton: {
+        padding: 8,
     },
     centered: {
         flex: 1,

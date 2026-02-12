@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
 
 interface TopNavBarProps {
     title: string;
@@ -16,7 +17,13 @@ const TopNavBar = ({ title, onBack, rightComponent }: TopNavBarProps) => {
             <View style={styles.content}>
                 <View style={styles.left}>
                     {onBack && (
-                        <TouchableOpacity onPress={onBack} style={styles.backButton}>
+                        <TouchableOpacity
+                            onPress={() => {
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                onBack();
+                            }}
+                            style={styles.backButton}
+                        >
                             <Text style={styles.backIcon}>←</Text>
                         </TouchableOpacity>
                     )}

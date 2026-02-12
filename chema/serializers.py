@@ -81,12 +81,16 @@ class PostImageSerializer(serializers.ModelSerializer):
         model = PostImage
         fields = ['id', 'post', 'image', 'uploaded_at']
 
+from chema.models import Comment
+
 class ReplySerializer(serializers.ModelSerializer):
     author_detail = ProfileSerializer(source='author', read_only=True)
+    comment = serializers.PrimaryKeyRelatedField(queryset=Comment.objects.all())
 
     class Meta:
         model = Reply
-        fields = ['id', 'author', 'author_detail', 'content', 'created_at']
+        fields = ['id', 'author', 'author_detail', 'content', 'created_at', 'comment']
+        read_only_fields = ['author', 'created_at']
 
 class CommentSerializer(serializers.ModelSerializer):
     author_detail = ProfileSerializer(source='author', read_only=True)

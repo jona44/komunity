@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import {
     View, Text, StyleSheet, FlatList, TouchableOpacity,
-    ActivityIndicator, Image, Alert, ScrollView
+    ActivityIndicator, Image, Alert, ScrollView, RefreshControl
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import client from '../api/client';
+import { authenticateAction } from '../utils/biometrics';
 
 interface Member {
     id: number;
@@ -53,6 +54,7 @@ const GroupManagementScreen = ({ group, onBack, onSelectMember, onViewWallet }: 
     const [loading, setLoading] = useState(true);
     const [processingId, setProcessingId] = useState<number | null>(null);
     const [activeTab, setActiveTab] = useState<'pending' | 'members' | 'payouts'>('pending');
+    const [refreshing, setRefreshing] = useState(false);
 
     // Beneficiary selection state
     const [isAssigningBeneficiary, setIsAssigningBeneficiary] = useState<number | null>(null);
@@ -62,7 +64,8 @@ const GroupManagementScreen = ({ group, onBack, onSelectMember, onViewWallet }: 
     }, []);
 
     const fetchData = async () => {
-        setLoading(true);
+        // Only set page loading on initial load, not refresh
+        if (!refreshing) setLoading(true);
         try {
             const [pendingRes, activeRes, deceasedRes] = await Promise.all([
                 client.get(`groups/${group.id}/pending_members/`),
@@ -77,7 +80,13 @@ const GroupManagementScreen = ({ group, onBack, onSelectMember, onViewWallet }: 
             Alert.alert('Error', 'Failed to load group information.');
         } finally {
             setLoading(false);
+            setRefreshing(false);
         }
+    };
+
+    const onRefresh = () => {
+        setRefreshing(true);
+        fetchData();
     };
 
     const handleApprove = async (membershipId: number) => {
@@ -126,6 +135,10 @@ const GroupManagementScreen = ({ group, onBack, onSelectMember, onViewWallet }: 
                     text: 'Disburse',
                     style: 'destructive',
                     onPress: async () => {
+                        // Biometric verification for disbursement
+                        const authenticated = await authenticateAction(`Authenticate to disburse $${deceased.balance} to ${deceased.beneficiary_detail?.full_name}`);
+                        if (!authenticated) return;
+
                         setProcessingId(deceasedId);
                         try {
                             await client.post(`deceased/${deceasedId}/disburse_funds/`);
@@ -350,6 +363,14 @@ const GroupManagementScreen = ({ group, onBack, onSelectMember, onViewWallet }: 
                     }
                     keyExtractor={(item) => item.id.toString()}
                     contentContainerStyle={styles.listContent}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={onRefresh}
+                            colors={['#2563eb']}
+                            tintColor="#2563eb"
+                        />
+                    }
                     renderItem={({ item }) => {
                         if (activeTab === 'payouts') {
                             return renderDeceasedItem({ item: item as DeceasedMember });

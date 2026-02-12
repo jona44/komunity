@@ -123,4 +123,34 @@ class EmailVerificationToken(models.Model):
         """Check if token is still valid (not expired)."""
         return timezone.now() < self.expires_at
 
+class DeviceToken(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='device_tokens')
+    token = models.CharField(max_length=255, unique=True, db_index=True)
+    platform = models.CharField(max_length=50, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f"Token for {self.user}"
+
+    class Meta:
+        verbose_name = 'Device Token'
+        verbose_name_plural = 'Device Tokens'
+
+class Notification(models.Model):
+    recipient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='notifications')
+    title = models.CharField(max_length=255)
+    message = models.TextField()
+    data = models.JSONField(default=dict, blank=True)
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    notification_type = models.CharField(max_length=50, blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.title} -> {self.recipient.email}"
+
+    class Meta:
+        ordering = ['-created_at']
+
         

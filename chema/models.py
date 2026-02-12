@@ -80,7 +80,21 @@ class Group(models.Model):
         ).exists()
 
     def is_member(self, user):
-        return self.members.filter(id=user.profile.id, groupmembership__is_active=True).exists()
+        if not user or not user.is_authenticated:
+            return False
+        if user.is_superuser:
+            return True
+        try:
+            profile = user.profile
+        except Exception:
+            return False
+            
+        return self.groupmembership_set.filter(
+            member=profile, 
+            status='active',
+            is_active=True
+        ).exists()
+
 
     def can_join(self, user):
         """Check if user can join this group"""

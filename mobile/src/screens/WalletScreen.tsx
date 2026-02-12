@@ -2,10 +2,13 @@ import React, { useEffect, useState } from 'react';
 import {
     View, Text, StyleSheet, FlatList, TouchableOpacity,
     ActivityIndicator, SafeAreaView, ScrollView, RefreshControl,
-    Modal, TextInput, Alert, KeyboardAvoidingView, Platform, Image
+    Modal, TextInput, Alert, KeyboardAvoidingView, Platform
 } from 'react-native';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
 import client from '../api/client';
+import { authenticateAction } from '../utils/biometrics';
 
 interface Transaction {
     id: number;
@@ -27,7 +30,7 @@ interface Transaction {
     };
 }
 
-const WalletScreen = ({ onBack }: { onBack: () => void }) => {
+const WalletScreen = ({ onBack, onViewContributions }: { onBack: () => void; onViewContributions?: () => void }) => {
     const insets = useSafeAreaInsets();
     const [balance, setBalance] = useState<string>('0.00');
     const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -145,6 +148,10 @@ const WalletScreen = ({ onBack }: { onBack: () => void }) => {
             return;
         }
 
+        // Authenticate before sending money
+        const authenticated = await authenticateAction(`Authenticate to send ${formatCurrency(sendAmount)} to ${selectedRecipient.member_detail.full_name}`);
+        if (!authenticated) return;
+
         setIsSending(true);
         try {
             console.log('Selected recipient:', selectedRecipient);
@@ -158,6 +165,7 @@ const WalletScreen = ({ onBack }: { onBack: () => void }) => {
             console.log('Send money payload:', payload);
 
             await client.post('wallets/send_money/', payload);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             Alert.alert('Success', `Successfully sent ${formatCurrency(sendAmount)} to ${selectedRecipient.member_detail.full_name}`);
             setShowSendMoney(false);
             setSendAmount('');
@@ -167,6 +175,7 @@ const WalletScreen = ({ onBack }: { onBack: () => void }) => {
         } catch (error: any) {
             console.error('Send money error:', error);
             console.error('Error response:', error.response?.data);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
             const errorMsg = error.response?.data?.error || 'Failed to send money. Please try again.';
             Alert.alert('Error', errorMsg);
         } finally {
@@ -198,6 +207,10 @@ const WalletScreen = ({ onBack }: { onBack: () => void }) => {
             Alert.alert('Insufficient Funds', 'You do not have enough balance for this contribution.');
             return;
         }
+
+        // Authenticate before contribution
+        const authenticated = await authenticateAction(`Authenticate to contribute ${formatCurrency(contributeAmount)} to ${selectedDeceased.deceased_detail.full_name}'s fund`);
+        if (!authenticated) return;
 
         setIsContributing(true);
         try {
@@ -297,6 +310,15 @@ const WalletScreen = ({ onBack }: { onBack: () => void }) => {
                             <Text style={styles.actionIcon}>🕊️</Text>
                             <Text style={styles.actionText}>Contribute</Text>
                         </TouchableOpacity>
+                        {onViewContributions && (
+                            <TouchableOpacity
+                                style={styles.actionButton}
+                                onPress={onViewContributions}
+                            >
+                                <Text style={styles.actionIcon}>📋</Text>
+                                <Text style={styles.actionText}>History</Text>
+                            </TouchableOpacity>
+                        )}
                     </View>
                 </View>
 

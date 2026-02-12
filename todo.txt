@@ -14,13 +14,13 @@
       - Auto-login on app launch if token exists
       - Files: mobile/App.tsx, mobile/src/api/client.ts
 
-[ ] 2. Password Reset on Mobile
+[x] 2. Password Reset on Mobile ✅ DONE
       - Add "Forgot Password?" link on LoginScreen
       - Create PasswordResetScreen (email input → backend sends reset email)
       - Backend already supports: /password-reset/, /password-reset-confirm/
       - Files: mobile/src/screens/LoginScreen.tsx (new screen needed)
 
-[ ] 3. Pull-to-Refresh Everywhere
+[x] 3. Pull-to-Refresh Everywhere ✅ DONE
       - HomeScreen (My Groups list)
       - GroupFeedScreen (posts list)
       - DiscoveryScreen (explore groups)
@@ -29,110 +29,134 @@
       - WalletScreen already has it ✅
       - Use React Native RefreshControl component
 
-[ ] 4. Reply to Comments on Mobile
+[x] 4. Reply to Comments on Mobile ✅ DONE
       - PostDetailScreen currently shows replies but can't create them
       - Add reply input for each comment
       - API exists: ReplyViewSet (POST /api/v1/replies/)
       - Files: mobile/src/screens/PostDetailScreen.tsx
+      - Backend: Added 'comment' field to ReplySerializer
 
-[ ] 5. Edit/Delete Own Comments on Mobile
+[x] 5. Edit/Delete Own Comments on Mobile ✅ DONE
       - Add edit and delete actions to own comments
-      - Show context menu (long-press or ... button)
-      - API exists: CommentViewSet supports PUT/PATCH/DELETE
+      - API already supports update/destroy for owner
       - Files: mobile/src/screens/PostDetailScreen.tsx
+      - Added edit/delete for replies too
 
 
 ========================================
   PHASE 2 — ENHANCED ENGAGEMENT
 ========================================
 
-[ ] 6. Push Notifications (expo-notifications)
-      - New post in your group
-      - Contribution received
+[x] 6. Push Notifications (expo-notifications) ✅ DONE
+      - New post in your group (limited to 20 members)
+      - Contribution received (contributor + admin)
       - Membership approved/rejected
-      - Deceased member declared
-      - Funds disbursed
-      - Requires: backend notification model + FCM/APNs setup
-      - Package: expo-notifications
+      - Deceased member declared (admins)
+      - Funds disbursed (beneficiary)
+      - Requires: backend notification model + FCM/APNs setup (DeviceToken + Notification models created)
+      - Package: expo-notifications + expo-server-sdk
 
-[ ] 7. Edit Posts on Mobile
-      - Users can create and delete but can't edit posts
-      - Add edit button on own posts in PostDetailScreen
+[x] 7. Edit Posts on Mobile ✅ DONE
+      - Users can create, delete, and now EDIT posts
+      - Implemented CreatePostScreen to support editing mode
+      - Added "Edit" button to PostDetailScreen
+      - Handles text update and image deletion/addition
+      - Updated App.tsx to manage editing state
       - API supports PATCH on PostViewSet
       - Files: mobile/src/screens/PostDetailScreen.tsx (new EditPostScreen?)
 
-[ ] 8. Search on Mobile
+[x] 8. Search on Mobile ✅ DONE
       - Web has search across groups and members
-      - Add search bar to HomeScreen and/or DiscoveryScreen
-      - Backend: chema/views.py search_view exists
-      - Need API endpoint for search (or use existing group list with query param)
+      - SearchScreen.tsx created with debounced search, group & member results
+      - Integrated into HomeScreen and DiscoveryScreen
+      - Backend: api_v1/views.py search_api_view endpoint at /api/v1/search/
 
-[ ] 9. Contributions List/History on Mobile
-      - Web has rich contribution tracking page with filters
-      - Mobile only handles contribution creation
-      - Add ContributionsScreen showing history per group/deceased
-      - API: ContributionViewSet exists
+[x] 9. Contributions List/History on Mobile ✅ DONE
+      - ContributionsScreen.tsx created with summary stats, filter by deceased, pull-to-refresh
+      - Accessible from WalletScreen via "History" quick action button
+      - Shows total contributed, contribution count, number of funds
+      - Filter tabs for each deceased member's fund
+      - API: ContributionViewSet at /api/v1/contributions/
 
-[ ] 10. Edit Group on Mobile (Admin)
-       - Admins can manage members but can't edit group info
-       - Add edit group name, description, cover image
-       - API supports PATCH on GroupViewSet
-       - Files: new screen or modal in GroupDetailScreen
+[x] 10. Edit Group on Mobile (Admin) ✅ DONE
+       - EditGroupScreen.tsx created with name, description, cover image, approval toggle
+       - Uses PATCH on /api/v1/groups/{id}/ with multipart/form-data for image upload
+       - Edit button (✏️) added to GroupDetailScreen banner, visible to admins only
+       - Change detection disables Save when nothing is modified
+       - Updates propagate back to GroupDetailScreen and selectedGroup state
 
 
 ========================================
   PHASE 3 — POLISH & GROWTH
 ========================================
 
-[ ] 11. Animated Page Transitions
-       - Current screen switches are instant cuts
-       - Add react-native-reanimated or react-navigation for smooth transitions
-       - Consider shared element transitions for group cards → detail
+[x] 11. Animated Page Transitions ✅ DONE
+       - AnimatedScreen.tsx component using RN built-in Animated API (zero deps)
+       - 4 animation types: fadeSlide, fade, slideUp, slideRight
+       - slideUp for create/edit modals (CreateGroup, CreatePost, EditGroup)
+       - slideRight for push navigation (GroupDetail, Members, Wallet, etc.)
+       - fadeSlide for content screens (PostDetail, GroupFeed)
+       - All screens in App.tsx wrapped with appropriate animations
 
-[ ] 12. Pagination for Feeds
-       - No FlatList pagination currently — loads all data at once
-       - Add infinite scroll to GroupFeedScreen, DiscoveryScreen, contributions
-       - Backend: add ?page= and ?page_size= to viewsets (DRF pagination)
+[x] 12. Pagination for Feeds ✅ DONE
+       - Backend: StandardPagination class (15/page, max 50) in api_v1/views.py
+       - Applied to PostViewSet and ContributionViewSet
+       - GroupFeedScreen: infinite scroll with onEndReached, footer spinner, page extraction from next URL
+       - ContributionsScreen: same infinite scroll pattern
+       - Handles both paginated {results,next} and flat array responses for backwards compat
 
-[ ] 13. Camera Integration
-       - Currently only gallery picker for profile/post photos
-       - Add option to take photo directly with expo-camera
-       - Files: ProfileSetupScreen, ProfileScreen, CreatePostScreen
+[x] 13. Camera Integration ✅ DONE
+       - Added `takePhoto` via `expo-image-picker`'s `launchCameraAsync`
+       - Updated CreatePostScreen with camera icon in toolbar
+       - Updated ProfileSetupScreen, ProfileScreen, and EditGroupScreen with source picker (Alert)
+       - Handles camera permissions properly on both iOS and Android
 
-[ ] 14. Biometric Auth for Wallet Transactions
-       - Use expo-local-authentication for fingerprint/face ID
-       - Require biometric before: send money, top-up, disburse funds
-       - Package: expo-local-authentication
+[x] 14. Biometric Auth for Wallet Transactions ✅ DONE
+       - Installed `expo-local-authentication`
+       - Created `src/utils/biometrics.ts` utility
+       - Integrated into WalletScreen (Send Money, Contribute)
+       - Integrated into GroupManagementScreen (Disburse Funds)
+       - Added descriptive prompts for FaceID/TouchID/PIN verification
 
-[ ] 15. Deep Linking
-       - Open specific group/post from notification or shared URL
-       - Configure URL scheme in app.json
-       - Package: expo-linking
+[x] 15. Deep Linking ✅ DONE
+       - Configured `komunity` scheme in `app.json`
+       - Implemented `handleDeepLink` in `App.tsx`
+       - Support for `/group/:id` and `/post/:id`
+       - Automatically fetches remote metadata and navigates to the target screen
+       - Package: `expo-linking`
 
-[ ] 16. Image Caching
-       - No image caching — scroll performance suffers with many profile pics
-       - Switch to expo-image (built-in caching, blurhash, transitions)
-       - Replace <Image> with <ExpoImage> across screens
+[x] 16. Image Caching ✅ DONE
+       - Replaced native `Image` with `expo-image` across all major screens.
+       - Enabled smooth transitions for better UX.
+       - Achieved first-class caching and scroll performance.
+       - Package: `expo-image`
 
-[ ] 17. Loading Skeletons
-       - Replace ActivityIndicator spinners with shimmer placeholders
-       - More polished loading experience
+[x] 17. Loading Skeletons ✅ DONE
+       - Created reusable pulse-animated `Skeleton` component
+       - Implemented `FeedPlaceholder` and `GroupPlaceholder`
+       - Applied to `HomeScreen`, `GroupFeedScreen`, and `DiscoveryScreen`
+       - Improved visual stability during data transitions
        - Consider: react-native-skeleton-placeholder or custom
 
-[ ] 18. Haptic Feedback
-       - Add tactile feedback on: like, send money, join, approve member
-       - Package: expo-haptics
-       - Quick win for premium feel
+[x] 18. Haptic Feedback ✅ DONE
+       - Integrated `expo-haptics` into navigation and actions.
+       - Light impact for tab switching and back navigation.
+       - Success/Error notifications for wallet transactions.
+       - Improved tactile engagement across the app.
+       - Package: `expo-haptics`r premium feel
 
-[ ] 19. Share Posts
-       - Allow users to share posts outside the app
-       - Use Expo Share API
-       - Add share button to post footer (currently has placeholder 🚀 share)
+[x] 19. Share Posts ✅ DONE
+       - Implemented native sharing for posts and communities.
+       - Generates deep link URLs (e.g., `komunity://post/:id`).
+       - Supported in `GroupFeedScreen`, `PostDetailScreen`, and `DiscoveryScreen`.
+       - Added tactile feedback to the share action.
 
-[ ] 20. Invite via Contacts (Future)
-       - Let users invite friends to join communities
-       - Package: expo-contacts
-       - Needs backend invite/referral system
+[x] 20. Invite via Contacts ✅ DONE
+       - Implemented `ContactsScreen` for sending SMS invites.
+       - Uses `expo-contacts` to fetch phone numbers and emails.
+       - Uses `expo-sms` for sending pre-filled invitations.
+       - Generates deep links for specific communities or general invites.
+       - Integrated into `GroupDetailScreen` for admins.
 
 
 ========================================

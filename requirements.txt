@@ -16,6 +16,7 @@ django-browser-reload==1.17.0
 django-tailwind==3.8.0
 django-widget-tweaks==1.5.0
 docutils==0.14
+exponent-server-sdk
 filelock==3.9.0
 idna==3.4
 msal==1.24.1

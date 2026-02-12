@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import {
-    View, Text, FlatList, StyleSheet, Image,
+    View, Text, FlatList, StyleSheet,
     ActivityIndicator, TouchableOpacity, SafeAreaView,
-    Dimensions, ScrollView, TextInput, KeyboardAvoidingView, Platform, Alert
+    Dimensions, ScrollView, TextInput, KeyboardAvoidingView, Platform, Alert, Share
 } from 'react-native';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
 import client from '../api/client';
 
 const { width } = Dimensions.get('window');
@@ -49,9 +51,10 @@ interface Post {
 interface PostDetailProps {
     post: Post;
     onBack: () => void;
+    onEditPost?: (post: Post) => void;
 }
 
-const PostDetailScreen = ({ post, onBack }: PostDetailProps) => {
+const PostDetailScreen = ({ post, onBack, onEditPost }: PostDetailProps) => {
     const insets = useSafeAreaInsets();
     const [comments, setComments] = useState<Comment[]>([]);
     const [loading, setLoading] = useState(true);
@@ -61,6 +64,8 @@ const PostDetailScreen = ({ post, onBack }: PostDetailProps) => {
     const [hasLiked, setHasLiked] = useState(post.has_liked);
     const [replyingTo, setReplyingTo] = useState<Comment | null>(null);
     const [currentUserProfile, setCurrentUserProfile] = useState<any>(null);
+
+    const inputRef = React.useRef<TextInput>(null);
 
     useEffect(() => {
         fetchComments();
@@ -123,10 +128,109 @@ const PostDetailScreen = ({ post, onBack }: PostDetailProps) => {
         }
     };
 
+    const handleReplyPress = (comment: Comment) => {
+        setReplyingTo(comment);
+        setTimeout(() => {
+            inputRef.current?.focus();
+        }, 100);
+    };
+
+    const [editingComment, setEditingComment] = useState<Comment | null>(null);
+    const [editingReply, setEditingReply] = useState<Reply | null>(null);
+
+    const handleEditComment = (comment: Comment) => {
+        setEditingComment(comment);
+        setEditingReply(null);
+        setNewComment(comment.content);
+        setReplyingTo(null);
+        setTimeout(() => {
+            inputRef.current?.focus();
+        }, 100);
+    };
+
+    const handleEditReply = (reply: Reply) => {
+        setEditingReply(reply);
+        setEditingComment(null);
+        setNewComment(reply.content);
+        setReplyingTo(null);
+        setTimeout(() => {
+            inputRef.current?.focus();
+        }, 100);
+    };
+
+    const handleShare = async () => {
+        try {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            const shareUrl = `komunity://post/${post.id}`;
+            await Share.share({
+                message: `${post.author_detail.full_name} shared a post in Komunity!\n\n"${post.content}"\n\nView here: ${shareUrl}`,
+            });
+        } catch (error) {
+            console.error('Error sharing:', error);
+        }
+    };
+
+
+    const handleDeleteComment = (commentId: number) => {
+        Alert.alert(
+            'Delete Comment',
+            'Are you sure you want to delete this comment?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await client.delete(`comments/${commentId}/`);
+                            fetchComments();
+                        } catch (error) {
+                            console.error('Error deleting comment:', error);
+                            Alert.alert('Error', 'Failed to delete comment.');
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
+    const handleDeleteReply = (replyId: number) => {
+        Alert.alert(
+            'Delete Reply',
+            'Are you sure you want to delete this reply?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await client.delete(`replies/${replyId}/`);
+                            fetchComments();
+                        } catch (error) {
+                            console.error('Error deleting reply:', error);
+                            Alert.alert('Error', 'Failed to delete reply.');
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
     const handleSendComment = async () => {
         if (!newComment.trim()) return;
         try {
-            if (replyingTo) {
+            if (editingComment) {
+                await client.patch(`comments/${editingComment.id}/`, {
+                    content: newComment
+                });
+                setEditingComment(null);
+            } else if (editingReply) {
+                await client.patch(`replies/${editingReply.id}/`, {
+                    content: newComment
+                });
+                setEditingReply(null);
+            } else if (replyingTo) {
                 await client.post('replies/', {
                     comment: replyingTo.id,
                     content: newComment
@@ -140,8 +244,10 @@ const PostDetailScreen = ({ post, onBack }: PostDetailProps) => {
             }
             fetchComments();
             setNewComment('');
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error sending comment:', error);
+            const errorMsg = error.response?.data ? JSON.stringify(error.response.data) : 'Failed to send comment.';
+            Alert.alert('Error', errorMsg);
         }
     };
 
@@ -165,6 +271,7 @@ const PostDetailScreen = ({ post, onBack }: PostDetailProps) => {
                         <Image
                             source={{ uri: post.author_detail.profile_picture }}
                             style={styles.avatarImage}
+                            transition={200}
                         />
                     ) : (
                         <Text style={styles.avatarInitial}>
@@ -177,9 +284,16 @@ const PostDetailScreen = ({ post, onBack }: PostDetailProps) => {
                     <Text style={styles.timestamp}>{formatDate(post.created_at)}</Text>
                 </View>
                 {currentUserProfile && currentUserProfile.id === post.author_detail.id && (
-                    <TouchableOpacity onPress={handleDeletePost} style={styles.deleteButton}>
-                        <Text style={styles.deleteButtonText}>🗑️</Text>
-                    </TouchableOpacity>
+                    <View style={{ flexDirection: 'row' }}>
+                        {onEditPost && (
+                            <TouchableOpacity onPress={() => onEditPost(post)} style={styles.deleteButton}>
+                                <Text style={styles.deleteButtonText}>✏️</Text>
+                            </TouchableOpacity>
+                        )}
+                        <TouchableOpacity onPress={handleDeletePost} style={styles.deleteButton}>
+                            <Text style={styles.deleteButtonText}>🗑️</Text>
+                        </TouchableOpacity>
+                    </View>
                 )}
             </View>
 
@@ -198,7 +312,8 @@ const PostDetailScreen = ({ post, onBack }: PostDetailProps) => {
                             <Image
                                 source={{ uri: img.image }}
                                 style={styles.detailPostImage}
-                                resizeMode="cover"
+                                contentFit="cover"
+                                transition={300}
                             />
                         )}
                     />
@@ -226,6 +341,13 @@ const PostDetailScreen = ({ post, onBack }: PostDetailProps) => {
                     <Text style={styles.interactionIcon}>💬</Text>
                     <Text style={styles.interactionText}>{comments.length} Comments</Text>
                 </View>
+                <TouchableOpacity
+                    style={styles.interactionButton}
+                    onPress={handleShare}
+                >
+                    <Text style={styles.interactionIcon}>🚀</Text>
+                    <Text style={styles.interactionText}>Share</Text>
+                </TouchableOpacity>
             </View>
 
             <View style={styles.divider} />
@@ -237,7 +359,7 @@ const PostDetailScreen = ({ post, onBack }: PostDetailProps) => {
         <View style={styles.container}>
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 25}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
                 style={{ flex: 1 }}
             >
                 {loading ? (
@@ -258,6 +380,7 @@ const PostDetailScreen = ({ post, onBack }: PostDetailProps) => {
                                             <Image
                                                 source={{ uri: comment.author_detail.profile_picture }}
                                                 style={styles.avatarImage}
+                                                transition={200}
                                             />
                                         ) : (
                                             <Text style={[styles.avatarInitial, { fontSize: 14 }]}>
@@ -273,11 +396,29 @@ const PostDetailScreen = ({ post, onBack }: PostDetailProps) => {
                                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                             <Text style={styles.commentTime}>{formatDate(comment.created_at)}</Text>
                                             <TouchableOpacity
-                                                onPress={() => setReplyingTo(comment)}
+                                                onPress={() => handleReplyPress(comment)}
                                                 style={{ marginLeft: 12, marginTop: 4 }}
                                             >
                                                 <Text style={styles.replyButtonText}>Reply</Text>
                                             </TouchableOpacity>
+
+                                            {/* Edit/Delete for own comments */}
+                                            {currentUserProfile && currentUserProfile.id === comment.author_detail.id && (
+                                                <>
+                                                    <TouchableOpacity
+                                                        onPress={() => handleEditComment(comment)}
+                                                        style={{ marginLeft: 12, marginTop: 4 }}
+                                                    >
+                                                        <Text style={styles.replyButtonText}>Edit</Text>
+                                                    </TouchableOpacity>
+                                                    <TouchableOpacity
+                                                        onPress={() => handleDeleteComment(comment.id)}
+                                                        style={{ marginLeft: 12, marginTop: 4 }}
+                                                    >
+                                                        <Text style={[styles.replyButtonText, { color: '#ef4444' }]}>Delete</Text>
+                                                    </TouchableOpacity>
+                                                </>
+                                            )}
                                         </View>
                                     </View>
                                 </View>
@@ -289,6 +430,7 @@ const PostDetailScreen = ({ post, onBack }: PostDetailProps) => {
                                                 <Image
                                                     source={{ uri: reply.author_detail.profile_picture }}
                                                     style={styles.avatarImage}
+                                                    transition={200}
                                                 />
                                             ) : (
                                                 <Text style={[styles.avatarInitial, { fontSize: 12 }]}>
@@ -301,6 +443,21 @@ const PostDetailScreen = ({ post, onBack }: PostDetailProps) => {
                                                 <Text style={[styles.commentAuthor, { fontSize: 13 }]}>{reply.author_detail.full_name}</Text>
                                                 <Text style={[styles.commentText, { fontSize: 13 }]}>{reply.content}</Text>
                                             </View>
+                                            {currentUserProfile && currentUserProfile.id === reply.author_detail.id && (
+                                                <View style={{ flexDirection: 'row', marginTop: 4 }}>
+                                                    <TouchableOpacity
+                                                        onPress={() => handleEditReply(reply)}
+                                                        style={{ marginRight: 12 }}
+                                                    >
+                                                        <Text style={[styles.replyButtonText, { fontSize: 11 }]}>Edit</Text>
+                                                    </TouchableOpacity>
+                                                    <TouchableOpacity
+                                                        onPress={() => handleDeleteReply(reply.id)}
+                                                    >
+                                                        <Text style={[styles.replyButtonText, { color: '#ef4444', fontSize: 11 }]}>Delete</Text>
+                                                    </TouchableOpacity>
+                                                </View>
+                                            )}
                                         </View>
                                     </View>
                                 ))}
@@ -316,17 +473,27 @@ const PostDetailScreen = ({ post, onBack }: PostDetailProps) => {
 
                 <View style={[styles.inputContainer, { paddingBottom: Math.max(insets.bottom, 10) }]}>
                     <View style={{ flex: 1 }}>
-                        {replyingTo && (
+                        {(replyingTo || editingComment || editingReply) && (
                             <View style={styles.replyContext}>
-                                <Text style={styles.replyContextText}>Replying to {replyingTo.author_detail.full_name}</Text>
-                                <TouchableOpacity onPress={() => setReplyingTo(null)}>
+                                <Text style={styles.replyContextText}>
+                                    {editingComment ? 'Editing comment...' :
+                                        editingReply ? 'Editing reply...' :
+                                            `Replying to ${replyingTo?.author_detail.full_name}`}
+                                </Text>
+                                <TouchableOpacity onPress={() => {
+                                    setReplyingTo(null);
+                                    setEditingComment(null);
+                                    setEditingReply(null);
+                                    setNewComment('');
+                                }}>
                                     <Text style={styles.cancelReply}>Cancel</Text>
                                 </TouchableOpacity>
                             </View>
                         )}
                         <TextInput
+                            ref={inputRef}
                             style={styles.input}
-                            placeholder={replyingTo ? "Write a reply..." : "Write a comment..."}
+                            placeholder={replyingTo ? "Write a reply..." : editingComment || editingReply ? "Edit your text..." : "Write a comment..."}
                             value={newComment}
                             onChangeText={setNewComment}
                             multiline
@@ -381,6 +548,7 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: 'bold',
         color: '#111827',
+        marginBottom: 16
     },
     postHeaderContainer: {
         padding: 16,

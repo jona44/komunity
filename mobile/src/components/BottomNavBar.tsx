@@ -1,6 +1,8 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
 
 interface BottomNavBarProps {
     activeTab: 'home' | 'discovery' | 'wallet' | 'profile';
@@ -12,12 +14,22 @@ interface BottomNavBarProps {
 const BottomNavBar = ({ activeTab, onTabPress, onBack, profilePicture }: BottomNavBarProps) => {
     const insets = useSafeAreaInsets();
 
+    const handlePress = (tab: 'home' | 'discovery' | 'wallet' | 'profile') => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        onTabPress(tab);
+    };
+
+    const handleBack = () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        onBack?.();
+    };
+
     return (
         <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, 12) }]}>
             {onBack && (
                 <TouchableOpacity
                     style={styles.navItem}
-                    onPress={onBack}
+                    onPress={handleBack}
                 >
                     <Text style={styles.backIcon}>←</Text>
                     <Text style={styles.navText}>Back</Text>
@@ -26,7 +38,7 @@ const BottomNavBar = ({ activeTab, onTabPress, onBack, profilePicture }: BottomN
 
             <TouchableOpacity
                 style={styles.navItem}
-                onPress={() => onTabPress('home')}
+                onPress={() => handlePress('home')}
             >
                 <Text style={[styles.navIcon, activeTab === 'home' && styles.activeIcon]}>🏠</Text>
                 <Text style={[styles.navText, activeTab === 'home' && styles.activeText]}>My Groups</Text>
@@ -34,7 +46,7 @@ const BottomNavBar = ({ activeTab, onTabPress, onBack, profilePicture }: BottomN
 
             <TouchableOpacity
                 style={styles.navItem}
-                onPress={() => onTabPress('discovery')}
+                onPress={() => handlePress('discovery')}
             >
                 <Text style={[styles.navIcon, activeTab === 'discovery' && styles.activeIcon]}>🔍</Text>
                 <Text style={[styles.navText, activeTab === 'discovery' && styles.activeText]}>Explore</Text>
@@ -42,7 +54,7 @@ const BottomNavBar = ({ activeTab, onTabPress, onBack, profilePicture }: BottomN
 
             <TouchableOpacity
                 style={styles.navItem}
-                onPress={() => onTabPress('wallet')}
+                onPress={() => handlePress('wallet')}
             >
                 <Text style={[styles.navIcon, activeTab === 'wallet' && styles.activeIcon]}>💳</Text>
                 <Text style={[styles.navText, activeTab === 'wallet' && styles.activeText]}>Wallet</Text>
@@ -50,12 +62,13 @@ const BottomNavBar = ({ activeTab, onTabPress, onBack, profilePicture }: BottomN
 
             <TouchableOpacity
                 style={styles.navItem}
-                onPress={() => onTabPress('profile')}
+                onPress={() => handlePress('profile')}
             >
                 {profilePicture ? (
                     <Image
                         source={{ uri: profilePicture }}
                         style={[styles.profilePic, activeTab === 'profile' && styles.activeProfilePic]}
+                        transition={200}
                     />
                 ) : (
                     <Text style={[styles.navIcon, activeTab === 'profile' && styles.activeIcon]}>👤</Text>

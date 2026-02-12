@@ -1,6 +1,14 @@
 from rest_framework import viewsets, permissions, status
 from rest_framework.response import Response
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.permissions import AllowAny
+from rest_framework.pagination import PageNumberPagination
+
+
+class StandardPagination(PageNumberPagination):
+    page_size = 15
+    page_size_query_param = 'page_size'
+    max_page_size = 50
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
@@ -19,6 +27,26 @@ from wallet.serializers import WalletSerializer, TransactionSerializer
 
 from django.contrib.auth import get_user_model
 CustomUser = get_user_model()
+
+from user.notifications import send_push_notification
+
+class IsAuthorOrReadOnly(permissions.BasePermission):
+    """
+    Custom permission to only allow owners of an object to edit it.
+    """
+    def has_object_permission(self, request, view, obj):
+        if request.method in permissions.SAFE_METHODS:
+            return True
+        return obj.author == request.user.profile
+
+class IsPostImageAuthorOrReadOnly(permissions.BasePermission):
+    """
+    Custom permission to only allow owners of the post to delete its images.
+    """
+    def has_object_permission(self, request, view, obj):
+        if request.method in permissions.SAFE_METHODS:
+            return True
+        return obj.post.author == request.user.profile
 
 class ProfileViewSet(viewsets.ModelViewSet):
     queryset = Profile.objects.all()
@@ -139,10 +167,16 @@ class GroupViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get'])
     def transactions(self, request, pk=None):
         group = self.get_object()
-        # Anyone in the group can see the wallet history? 
-        # For now, yes, transparency.
-        if not group.is_member(request.user):
-            return Response({'error': 'Not fully authorized'}, status=status.HTTP_403_FORBIDDEN)
+        # Transparency: Any active member or admin can view history
+        is_member = group.is_member(request.user)
+        is_admin = group.is_admin(request.user)
+        
+        if not (is_member or is_admin):
+            return Response(
+                {'error': f'Access denied. You must be an active member of {group.name} to view its wallet.'}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+
             
         transactions = Transaction.objects.filter(
             destination_group=group,
@@ -163,6 +197,16 @@ class GroupMembershipViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Not authorized'}, status=status.HTTP_403_FORBIDDEN)
         
         membership.approve(request.user)
+        
+        # Notify the user
+        send_push_notification(
+            user=membership.member.user,
+            title=f"Welcome to {membership.group.name}!",
+            message="Your membership request has been approved.",
+            notification_type="membership_approved",
+            data={'group_id': membership.group.id}
+        )
+        
         return Response({'status': 'active'})
 
     @action(detail=True, methods=['post'])
@@ -174,6 +218,16 @@ class GroupMembershipViewSet(viewsets.ModelViewSet):
         membership.status = 'rejected'
         membership.is_active = False
         membership.save()
+        
+        # Notify the user
+        send_push_notification(
+            user=membership.member.user,
+            title=f"Membership Update for {membership.group.name}",
+            message="Your membership request was declined.",
+            notification_type="membership_rejected",
+            data={'group_id': membership.group.id}
+        )
+        
         return Response({'status': 'rejected'})
 
     @action(detail=True, methods=['post'])
@@ -196,12 +250,26 @@ class GroupMembershipViewSet(viewsets.ModelViewSet):
                 group=membership.group,
                 group_admin=request.user.profile
             )
+            
+        # Notify admins
+        admins = membership.group.members.filter(groupmembership__is_admin=True, groupmembership__is_active=True)
+        for admin_profile in admins:
+            if admin_profile == request.user.profile: continue # Skip sender
+            send_push_notification(
+                user=admin_profile.user,
+                title=f"Deceased Member Report",
+                message=f"{membership.member.full_name} has been declared deceased in {membership.group.name}.",
+                notification_type="deceased_declared",
+                data={'group_id': membership.group.id, 'deceased_id': membership.member.id}
+            )
         
         return Response({'status': 'deceased_declared'}, status=status.HTTP_200_OK)
 
 class PostViewSet(viewsets.ModelViewSet):
     queryset = Post.objects.filter(approved=True).order_by('-created_at')
     serializer_class = PostSerializer
+    permission_classes = [permissions.IsAuthenticated, IsAuthorOrReadOnly]
+    pagination_class = StandardPagination
 
     def get_queryset(self):
         queryset = Post.objects.filter(approved=True).order_by('-created_at')
@@ -232,18 +300,35 @@ class PostViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         try:
             profile = self.request.user.profile
-            serializer.save(author=profile)
-        except Exception:
-            # Handle potential missing profile
-            serializer.save()
+            post = serializer.save(author=profile)
+            
+            # Notify group members (limited to 20 for performance)
+            if post.group:
+                members = post.group.members.filter(groupmembership__is_active=True).exclude(id=profile.id)[:20]
+                for member in members:
+                    send_push_notification(
+                        user=member.user, # Profile -> User
+                        title=f"New Post in {post.group.name}",
+                        message=f"{profile.full_name} posted: {post.content[:40]}{'...' if len(post.content) > 40 else ''}",
+                        notification_type="new_post",
+                        data={'post_id': post.id, 'group_id': post.group.id}
+                    )
+
+        except Exception as e:
+            # Handle potential missing profile or notification errors
+            print(f"Error in post creation/notification: {e}")
+            if not serializer.instance: # If save failed before
+                 serializer.save()
 
 class PostImageViewSet(viewsets.ModelViewSet):
     queryset = PostImage.objects.all()
     serializer_class = PostImageSerializer
+    permission_classes = [permissions.IsAuthenticated, IsPostImageAuthorOrReadOnly]
 
 class CommentViewSet(viewsets.ModelViewSet):
     queryset = Comment.objects.all().order_by('-created_at')
     serializer_class = CommentSerializer
+    permission_classes = [permissions.IsAuthenticated, IsAuthorOrReadOnly]
 
     def get_queryset(self):
         queryset = Comment.objects.all().order_by('-created_at')
@@ -262,6 +347,7 @@ class CommentViewSet(viewsets.ModelViewSet):
 class ReplyViewSet(viewsets.ModelViewSet):
     queryset = Reply.objects.all().order_by('created_at')
     serializer_class = ReplySerializer
+    permission_classes = [permissions.IsAuthenticated, IsAuthorOrReadOnly]
 
     def perform_create(self, serializer):
         try:
@@ -314,6 +400,15 @@ class DeceasedViewSet(viewsets.ModelViewSet):
             # deceased.contributions_open = False
             deceased.save()
             
+            # Notify beneficiary
+            send_push_notification(
+                user=deceased.beneficiary.user,
+                title="Funds Received",
+                message=f"You received {balance} for {deceased.deceased.full_name}.",
+                notification_type="funds_disbursed",
+                data={'amount': str(balance)}
+            )
+            
         return Response({
             'status': 'success',
             'amount': balance,
@@ -324,9 +419,10 @@ class DeceasedViewSet(viewsets.ModelViewSet):
 class ContributionViewSet(viewsets.ModelViewSet):
     queryset = Contribution.objects.all()
     serializer_class = ContributionSerializer
+    pagination_class = StandardPagination
 
     def get_queryset(self):
-        return Contribution.objects.filter(contributing_member=self.request.user.profile)
+        return Contribution.objects.filter(contributing_member=self.request.user.profile).order_by('-contribution_date')
 
 class WalletViewSet(viewsets.ModelViewSet):
     serializer_class = WalletSerializer
@@ -488,6 +584,29 @@ class WalletViewSet(viewsets.ModelViewSet):
                 transaction=transaction
             )
 
+        # Send Notifications
+        try:
+            # Notify Contributor
+            send_push_notification(
+                user=request.user,
+                title="Contribution Successful",
+                message=f"You successfully contributed {amount} to {deceased.deceased.full_name}'s fund.",
+                notification_type="contribution_sent",
+                data={'contribution_id': contribution.id, 'deceased_id': deceased.id}
+            )
+            
+            # Notify Group Admin
+            if deceased.group_admin and deceased.group_admin.user:
+                send_push_notification(
+                    user=deceased.group_admin.user,
+                    title="New Contribution Received",
+                    message=f"{request.user.profile.full_name} contributed {amount} to {deceased.deceased.full_name}.",
+                    notification_type="contribution_received",
+                    data={'contribution_id': contribution.id, 'deceased_id': deceased.id}
+                )
+        except Exception as e:
+            print(f"Error sending contribution notifications: {e}")
+
         return Response({
             'status': 'success',
             'balance': wallet.get_balance(),
@@ -505,3 +624,91 @@ class TransactionViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         return Transaction.objects.filter(wallet__user=self.request.user).order_by('-timestamp')
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def password_reset_request(request):
+    """API endpoint for mobile password reset. Sends a reset email."""
+    from django.contrib.auth.forms import PasswordResetForm
+    from django.conf import settings
+
+    email = request.data.get('email', '').strip()
+    if not email:
+        return Response({'error': 'Email is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    form = PasswordResetForm(data={'email': email})
+    if form.is_valid():
+        form.save(
+            request=request,
+            use_https=request.is_secure(),
+            from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@chema101.com'),
+            email_template_name='registration/password_reset_email.html',
+        )
+    # Always return success to avoid revealing which emails exist
+    return Response({'detail': 'If an account with that email exists, a password reset link has been sent.'})
+
+from user.models import DeviceToken
+from user.serializers import DeviceTokenSerializer
+
+class DeviceTokenViewSet(viewsets.ModelViewSet):
+    queryset = DeviceToken.objects.all()
+    serializer_class = DeviceTokenSerializer
+    # Only authenticated users can register tokens
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return DeviceToken.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        # If token exists for this user, just update updated_at (handled by auto_now)
+        # But since token is unique, we might need to handle integrity error or use update_or_create logic manually
+        # OR we can let the frontend handle it by checking if it exists?
+        # Better: use create to get_or_create.
+        pass
+
+    @action(detail=False, methods=['post'])
+    def register(self, request):
+        token = request.data.get('token')
+        platform = request.data.get('platform')
+        
+        if not token:
+            return Response({'error': 'Token is required'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        # Update or create
+        # Ensure token is unique globally and assigned to current user
+        device_token, created = DeviceToken.objects.update_or_create(
+            token=token,
+            defaults={'user': request.user, 'platform': platform, 'is_active': True}
+        )
+        
+        return Response({'status': 'registered', 'created': created})
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def search_api_view(request):
+    """
+    Search groups and members.
+    Query param: q
+    """
+    from django.db.models import Q
+    query = request.GET.get('q', '').strip()
+    
+    if not query:
+        return Response({'groups': [], 'members': []})
+
+    groups = Group.objects.filter(
+        Q(name__icontains=query) | 
+        Q(description__icontains=query)
+    ).distinct()
+
+    members = Profile.objects.filter(
+        Q(user__email__icontains=query) | 
+        Q(first_name__icontains=query) | 
+        Q(surname__icontains=query)
+    ).distinct()
+
+    return Response({
+        'groups': GroupSerializer(groups, many=True, context={'request': request}).data,
+        'members': ProfileSerializer(members, many=True, context={'request': request}).data
+    })

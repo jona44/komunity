@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
-    Image, ActivityIndicator, Alert, TextInput, Pressable, Platform
+    ActivityIndicator, Alert, TextInput, Pressable, Platform
 } from 'react-native';
+import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -70,8 +71,38 @@ const ProfileScreen = ({ onBack, onLogout, onProfileUpdate }: ProfileScreenProps
     };
 
     const pickImage = async () => {
-        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        Alert.alert(
+            'Profile Picture',
+            'Choose a source for your profile photo',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Take Photo', onPress: handleCameraLaunch },
+                { text: 'Choose from Gallery', onPress: handleGalleryLaunch },
+            ]
+        );
+    };
 
+    const handleCameraLaunch = async () => {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== 'granted') {
+            Alert.alert('Permission Needed', 'We need permission to use your camera to change your profile picture.');
+            return;
+        }
+
+        const result = await ImagePicker.launchCameraAsync({
+            mediaTypes: ['images'],
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.7,
+        });
+
+        if (!result.canceled) {
+            setProfilePicture(result.assets[0].uri);
+        }
+    };
+
+    const handleGalleryLaunch = async () => {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== 'granted') {
             Alert.alert('Permission Needed', 'We need permission to access your gallery to change your profile picture.');
             return;
@@ -199,11 +230,13 @@ const ProfileScreen = ({ onBack, onLogout, onProfileUpdate }: ProfileScreenProps
                             <Image
                                 source={{ uri: profilePicture }}
                                 style={styles.avatar}
+                                transition={200}
                             />
                         ) : profile?.profile?.profile_picture ? (
                             <Image
                                 source={{ uri: profile.profile.profile_picture }}
                                 style={styles.avatar}
+                                transition={200}
                             />
                         ) : (
                             <View style={styles.avatarPlaceholder}>

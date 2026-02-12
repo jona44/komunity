@@ -1,6 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, Image, ActivityIndicator, TouchableOpacity, SafeAreaView, Alert } from 'react-native';
+import { View, Text, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, SafeAreaView, Alert, RefreshControl, Share } from 'react-native';
+import { Image } from 'expo-image';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
 import client from '../api/client';
+import SearchScreen from './SearchScreen';
+import { GroupPlaceholder } from '../components/Loaders';
 
 interface Group {
     id: number;
@@ -18,8 +23,11 @@ interface DiscoveryScreenProps {
 }
 
 const DiscoveryScreen = ({ onBack, onGroupJoined }: DiscoveryScreenProps) => {
+    const insets = useSafeAreaInsets();
     const [groups, setGroups] = useState<Group[]>([]);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+    const [searchVisible, setSearchVisible] = useState(false);
     const [joiningId, setJoiningId] = useState<number | null>(null);
 
     useEffect(() => {
@@ -28,13 +36,32 @@ const DiscoveryScreen = ({ onBack, onGroupJoined }: DiscoveryScreenProps) => {
 
     const fetchGroups = async () => {
         try {
-            const response = await client.get('groups/');
+            const response = await client.get('groups/discover/');
             setGroups(response.data);
         } catch (error) {
             console.error('Error fetching discovery groups:', error);
+            Alert.alert('Error', 'Failed to load discovery communities.');
         } finally {
             setLoading(false);
+            setRefreshing(false);
         }
+    };
+
+    const handleShareGroup = async (group: Group) => {
+        try {
+            await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            const shareUrl = `komunity://group/${group.id}`;
+            await Share.share({
+                message: `Check out "${group.name}" on Komunity!\n\n${group.description}\n\nJoin here: ${shareUrl}`,
+            });
+        } catch (error) {
+            console.error('Error sharing group:', error);
+        }
+    };
+
+    const onRefresh = () => {
+        setRefreshing(true);
+        fetchGroups();
     };
 
     const handleJoinGroup = (group: Group) => {
@@ -60,14 +87,13 @@ const DiscoveryScreen = ({ onBack, onGroupJoined }: DiscoveryScreenProps) => {
             if (status === 'active') {
                 Alert.alert('Welcome!', `You have successfully joined ${group.name}.`);
                 onGroupJoined();
-            } else {
-                Alert.alert('Request Sent', `Your request to join ${group.name} is pending approval.`);
+            } else if (status === 'pending') {
+                Alert.alert('Request Sent', 'Your request to join has been sent to the community admins.');
+                fetchGroups();
             }
-
-            fetchGroups();
         } catch (error) {
             console.error('Error joining group:', error);
-            Alert.alert('Error', 'Failed to join group. Please try again.');
+            Alert.alert('Error', 'Failed to join the community. Please try again.');
         } finally {
             setJoiningId(null);
         }
@@ -76,48 +102,84 @@ const DiscoveryScreen = ({ onBack, onGroupJoined }: DiscoveryScreenProps) => {
     const getButtonConfig = (group: Group) => {
         if (group.membership_status === 'active') {
             return {
-                label: '✓ Joined',
+                label: 'Joined',
                 style: styles.joinedButton,
                 textStyle: styles.joinedButtonText,
-                disabled: true,
+                disabled: true
             };
         }
         if (group.membership_status === 'pending') {
             return {
-                label: '⏳ Pending Approval',
+                label: 'Pending',
                 style: styles.pendingButton,
                 textStyle: styles.pendingButtonText,
-                disabled: true,
+                disabled: true
             };
         }
         return {
-            label: group.requires_approval ? 'Request to Join' : 'Join Group',
+            label: group.requires_approval ? 'Request to Join' : 'Join Community',
             style: styles.joinButton,
             textStyle: styles.joinButtonText,
-            disabled: false,
+            disabled: false
         };
     };
 
+    if (searchVisible) {
+        return (
+            <SearchScreen
+                onClose={() => setSearchVisible(false)}
+                onSelectGroup={(group) => {
+                    setSearchVisible(false);
+                    handleJoinGroup(group as any);
+                }}
+            />
+        );
+    }
+
     if (loading) {
         return (
-            <View style={styles.centered}>
-                <ActivityIndicator size="large" color="#2563eb" />
+            <View style={styles.container}>
+                <View style={styles.header}>
+                    <Text style={styles.headerTitle}>Explore</Text>
+                </View>
+                <GroupPlaceholder />
             </View>
         );
     }
 
     return (
         <View style={styles.container}>
+            <View style={[styles.header, { paddingTop: insets.top }]}>
+                <TouchableOpacity onPress={onBack} style={styles.backButton}>
+                    <Text style={styles.backButtonText}>←</Text>
+                </TouchableOpacity>
+                <Text style={styles.headerTitle}>Discover Communities</Text>
+                <TouchableOpacity onPress={() => setSearchVisible(true)} style={styles.searchButton}>
+                    <Text style={{ fontSize: 22 }}>🔍</Text>
+                </TouchableOpacity>
+            </View>
             <FlatList
                 data={groups}
                 keyExtractor={(item) => item.id.toString()}
                 contentContainerStyle={styles.listContent}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        colors={['#2563eb']}
+                        tintColor="#2563eb"
+                    />
+                }
                 renderItem={({ item }) => {
                     const btn = getButtonConfig(item);
                     return (
                         <View style={styles.groupCard}>
                             {item.cover_image ? (
-                                <Image source={{ uri: item.cover_image }} style={styles.coverImage} />
+                                <Image
+                                    source={{ uri: item.cover_image }}
+                                    style={styles.coverImage}
+                                    transition={200}
+                                />
                             ) : (
                                 <View style={[styles.coverImage, { backgroundColor: '#e5e7eb' }]} />
                             )}
@@ -128,17 +190,25 @@ const DiscoveryScreen = ({ onBack, onGroupJoined }: DiscoveryScreenProps) => {
                                     {item.description || 'Connecting community members together.'}
                                 </Text>
 
-                                <TouchableOpacity
-                                    style={[btn.style, joiningId === item.id && styles.buttonLoading]}
-                                    onPress={() => handleJoinGroup(item)}
-                                    disabled={btn.disabled || joiningId === item.id}
-                                >
-                                    {joiningId === item.id ? (
-                                        <ActivityIndicator size="small" color="#ffffff" />
-                                    ) : (
-                                        <Text style={btn.textStyle}>{btn.label}</Text>
-                                    )}
-                                </TouchableOpacity>
+                                <View style={styles.actionRow}>
+                                    <TouchableOpacity
+                                        style={[btn.style, joiningId === item.id && styles.buttonLoading, { flex: 4 }]}
+                                        onPress={() => handleJoinGroup(item)}
+                                        disabled={btn.disabled || joiningId === item.id}
+                                    >
+                                        {joiningId === item.id ? (
+                                            <ActivityIndicator size="small" color="#ffffff" />
+                                        ) : (
+                                            <Text style={btn.textStyle}>{btn.label}</Text>
+                                        )}
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={styles.shareIconBtn}
+                                        onPress={() => handleShareGroup(item)}
+                                    >
+                                        <Text style={styles.shareIconText}>🚀</Text>
+                                    </TouchableOpacity>
+                                </View>
                             </View>
                         </View>
                     );
@@ -158,17 +228,12 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#f3f4f6',
     },
-    centered: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 16,
-        paddingVertical: 12,
+        paddingBottom: 12,
         backgroundColor: '#ffffff',
         borderBottomWidth: 1,
         borderBottomColor: '#e5e7eb',
@@ -191,16 +256,21 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         color: '#111827',
     },
+    searchButton: {
+        width: 40,
+        height: 40,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
     listContent: {
         padding: 16,
+        paddingBottom: 100,
     },
     groupCard: {
         backgroundColor: '#ffffff',
         borderRadius: 16,
-        marginBottom: 20,
+        marginBottom: 16,
         overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: '#e5e7eb',
         elevation: 2,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
@@ -209,7 +279,7 @@ const styles = StyleSheet.create({
     },
     coverImage: {
         width: '100%',
-        height: 120,
+        height: 140,
     },
     cardContent: {
         padding: 16,
@@ -222,14 +292,31 @@ const styles = StyleSheet.create({
     },
     memberCount: {
         fontSize: 14,
-        color: '#6b7280',
-        marginBottom: 12,
+        color: '#3b82f6',
+        fontWeight: '600',
+        marginBottom: 8,
     },
     description: {
         fontSize: 14,
-        color: '#4b5563',
+        color: '#6b7280',
+        marginBottom: 16,
         lineHeight: 20,
-        marginBottom: 20,
+    },
+    actionRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    shareIconBtn: {
+        flex: 1,
+        height: 44,
+        borderRadius: 12,
+        backgroundColor: '#f3f4f6',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginLeft: 8,
+    },
+    shareIconText: {
+        fontSize: 20,
     },
     // Join button (default — not yet a member)
     joinButton: {
@@ -237,6 +324,11 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
         borderRadius: 12,
         alignItems: 'center',
+        shadowColor: '#2563eb',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 4,
     },
     joinButtonText: {
         color: '#ffffff',

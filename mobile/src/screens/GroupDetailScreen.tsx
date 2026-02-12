@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
     View, Text, StyleSheet, Image, ScrollView,
-    TouchableOpacity, SafeAreaView, Dimensions, ActivityIndicator, Alert
+    TouchableOpacity, SafeAreaView, Dimensions, ActivityIndicator, Alert, RefreshControl
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import client from '../api/client';
@@ -38,12 +38,15 @@ interface GroupDetailProps {
     onSelectMember: (membership: any) => void;
     onViewAllMembers: () => void;
     onViewWallet: () => void;
+    onEditGroup?: () => void;
+    onInvite?: () => void;
 }
 
-const GroupDetailScreen = ({ group, onBack, onViewFeed, onManage, onSelectMember, onViewAllMembers, onViewWallet }: GroupDetailProps) => {
+const GroupDetailScreen = ({ group, onBack, onViewFeed, onManage, onSelectMember, onViewAllMembers, onViewWallet, onEditGroup, onInvite }: GroupDetailProps) => {
     const insets = useSafeAreaInsets();
     const [members, setMembers] = useState<Member[]>([]);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
 
     useEffect(() => {
         fetchMembers();
@@ -60,7 +63,13 @@ const GroupDetailScreen = ({ group, onBack, onViewFeed, onManage, onSelectMember
             // Fallback: maybe the endpoint is different or not yet implemented
         } finally {
             setLoading(false);
+            setRefreshing(false);
         }
+    };
+
+    const onRefresh = () => {
+        setRefreshing(true);
+        fetchMembers();
     };
 
     const handleLeaveGroup = () => {
@@ -97,7 +106,17 @@ const GroupDetailScreen = ({ group, onBack, onViewFeed, onManage, onSelectMember
 
     return (
         <View style={[styles.container, { paddingTop: insets.top }]}>
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView
+                showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        colors={['#2563eb']}
+                        tintColor="#2563eb"
+                    />
+                }
+            >
                 <View style={styles.heroSection}>
                     {group.cover_image ? (
                         <Image source={{ uri: group.cover_image }} style={styles.coverImage} />
@@ -125,6 +144,22 @@ const GroupDetailScreen = ({ group, onBack, onViewFeed, onManage, onSelectMember
                                 <TouchableOpacity style={styles.bannerSecondaryButton} onPress={onManage}>
                                     <View style={styles.iconCircle}>
                                         <Text style={styles.iconText}>⚙️</Text>
+                                    </View>
+                                </TouchableOpacity>
+                            )}
+
+                            {group.is_admin && onEditGroup && (
+                                <TouchableOpacity style={styles.bannerSecondaryButton} onPress={onEditGroup}>
+                                    <View style={styles.iconCircle}>
+                                        <Text style={styles.iconText}>✏️</Text>
+                                    </View>
+                                </TouchableOpacity>
+                            )}
+
+                            {group.is_admin && onInvite && (
+                                <TouchableOpacity style={styles.bannerSecondaryButton} onPress={onInvite}>
+                                    <View style={styles.iconCircle}>
+                                        <Text style={styles.iconText}>✉️</Text>
                                     </View>
                                 </TouchableOpacity>
                             )}

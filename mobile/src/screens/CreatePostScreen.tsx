@@ -13,22 +13,38 @@ interface Group {
     name: string;
 }
 
+interface PostImage {
+    id: number;
+    image: string;
+}
+
+interface Post {
+    id: number;
+    content: string;
+    images: PostImage[];
+}
+
 interface CreatePostProps {
     group: Group;
+    post?: Post;
     onBack: () => void;
     onPostCreated: () => void;
 }
 
-const CreatePostScreen = ({ group, onBack, onPostCreated }: CreatePostProps) => {
+const CreatePostScreen = ({ group, post, onBack, onPostCreated }: CreatePostProps) => {
     const insets = useSafeAreaInsets();
-    const [content, setContent] = useState('');
-    const [images, setImages] = useState<string[]>([]);
+    const [content, setContent] = useState(post?.content || '');
+    // Store images with metadata: uri, isNew (local), id (remote)
+    const [images, setImages] = useState<{ uri: string; id?: number; isNew?: boolean }[]>(
+        post ? post.images.map(img => ({ uri: img.image, id: img.id, isNew: false })) : []
+    );
+    const [deletedImageIds, setDeletedImageIds] = useState<number[]>([]);
     const [loading, setLoading] = useState(false);
 
     const pickImage = async () => {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== 'granted') {
-            Alert.alert('Permission Denied', 'Sorry, we need camera roll permissions to make this work!');
+            Alert.alert('Permission Denied', 'Sorry, we need gallery permissions to make this work!');
             return;
         }
 
@@ -39,12 +55,36 @@ const CreatePostScreen = ({ group, onBack, onPostCreated }: CreatePostProps) => 
         });
 
         if (!result.canceled) {
-            const selectedImages = result.assets.map(asset => asset.uri);
+            const selectedImages = result.assets.map(asset => ({ uri: asset.uri, isNew: true }));
+            setImages([...images, ...selectedImages]);
+        }
+    };
+
+    const takePhoto = async () => {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== 'granted') {
+            Alert.alert('Permission Denied', 'Sorry, we need camera permissions to make this work!');
+            return;
+        }
+
+        const result = await ImagePicker.launchCameraAsync({
+            mediaTypes: ['images'],
+            quality: 0.8,
+        });
+
+        if (!result.canceled) {
+            const selectedImages = result.assets.map(asset => ({ uri: asset.uri, isNew: true }));
             setImages([...images, ...selectedImages]);
         }
     };
 
     const removeImage = (index: number) => {
+        const imageToRemove = images[index];
+        // If removing an existing remote image, mark for deletion
+        if (!imageToRemove.isNew && imageToRemove.id) {
+            setDeletedImageIds([...deletedImageIds, imageToRemove.id]);
+        }
+
         const newImages = [...images];
         newImages.splice(index, 1);
         setImages(newImages);
@@ -58,27 +98,42 @@ const CreatePostScreen = ({ group, onBack, onPostCreated }: CreatePostProps) => 
 
         setLoading(true);
         try {
-            // 1. Create the post
-            const postResponse = await client.post('posts/', {
-                group: group.id,
-                content: content,
-                approved: true // Auto-approve for now or let backend handle it
-            });
+            let postId;
 
-            const postId = postResponse.data.id;
+            if (post) {
+                // UPDATE existing post
+                await client.patch(`posts/${post.id}/`, {
+                    content: content
+                });
+                postId = post.id;
 
-            // 2. Upload images one by one if any
-            if (images.length > 0) {
-                for (const imageUri of images) {
+                // Handle deletions
+                for (const id of deletedImageIds) {
+                    await client.delete(`post-images/${id}/`);
+                }
+            } else {
+                // CREATE new post
+                const postResponse = await client.post('posts/', {
+                    group: group.id,
+                    content: content,
+                    approved: true
+                });
+                postId = postResponse.data.id;
+            }
+
+            // Upload NEW images
+            const newImages = images.filter(img => img.isNew);
+            if (newImages.length > 0) {
+                for (const imgWrapper of newImages) {
                     const formData = new FormData();
-                    formData.append('post', postId);
+                    formData.append('post', postId.toString());
 
-                    const filename = imageUri.split('/').pop() || 'upload.jpg';
+                    const filename = imgWrapper.uri.split('/').pop() || 'upload.jpg';
                     const match = /\.(\w+)$/.exec(filename);
                     const type = match ? `image/${match[1]}` : `image`;
 
                     formData.append('image', {
-                        uri: imageUri,
+                        uri: imgWrapper.uri,
                         name: filename,
                         type,
                     } as any);
@@ -91,11 +146,11 @@ const CreatePostScreen = ({ group, onBack, onPostCreated }: CreatePostProps) => 
                 }
             }
 
-            Alert.alert('Success', 'Your post has been shared with the community!');
+            Alert.alert('Success', post ? 'Post updated successfully!' : 'Your post has been shared with the community!');
             onPostCreated();
         } catch (error) {
-            console.error('Error creating post:', error);
-            Alert.alert('Error', 'Failed to create post. Please try again later.');
+            console.error(post ? 'Error updating post:' : 'Error creating post:', error);
+            Alert.alert('Error', 'Failed to save post. Please try again later.');
         } finally {
             setLoading(false);
         }
@@ -109,7 +164,7 @@ const CreatePostScreen = ({ group, onBack, onPostCreated }: CreatePostProps) => 
             >
                 <ScrollView style={styles.contentScroll} keyboardShouldPersistTaps="handled">
                     <View style={styles.groupContext}>
-                        <Text style={styles.postingToLabel}>Posting to </Text>
+                        <Text style={styles.postingToLabel}>{post ? 'Editing in ' : 'Posting to '}</Text>
                         <Text style={styles.groupNameText}>{group.name}</Text>
                     </View>
 
@@ -120,14 +175,14 @@ const CreatePostScreen = ({ group, onBack, onPostCreated }: CreatePostProps) => 
                         style={styles.textInput}
                         value={content}
                         onChangeText={setContent}
-                        autoFocus
+                        autoFocus={!post}
                     />
 
                     {images.length > 0 && (
                         <View style={styles.imageGrid}>
-                            {images.map((uri, index) => (
+                            {images.map((img, index) => (
                                 <View key={index} style={styles.imageWrapper}>
-                                    <Image source={{ uri }} style={styles.previewImage} />
+                                    <Image source={{ uri: img.uri }} style={styles.previewImage} />
                                     <TouchableOpacity
                                         style={styles.removeImageButton}
                                         onPress={() => removeImage(index)}
@@ -145,11 +200,11 @@ const CreatePostScreen = ({ group, onBack, onPostCreated }: CreatePostProps) => 
                         <TouchableOpacity style={styles.toolbarItem} onPress={pickImage}>
                             <Text style={styles.toolbarIcon}>🖼️</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.toolbarItem}>
-                            <Text style={styles.toolbarIcon}>📍</Text>
+                        <TouchableOpacity style={styles.toolbarItem} onPress={takePhoto}>
+                            <Text style={styles.toolbarIcon}>📷</Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.toolbarItem}>
-                            <Text style={styles.toolbarIcon}>🏷️</Text>
+                            <Text style={styles.toolbarIcon}>📍</Text>
                         </TouchableOpacity>
                     </View>
 

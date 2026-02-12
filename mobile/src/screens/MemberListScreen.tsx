@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import {
     View, Text, StyleSheet, FlatList, TouchableOpacity,
-    SafeAreaView, ActivityIndicator, Image, Alert
+    SafeAreaView, ActivityIndicator, Alert
 } from 'react-native';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import client from '../api/client';
 
@@ -58,6 +59,7 @@ const MemberListScreen = ({ group, onBack, onSelectMember }: MemberListProps) =>
                         <Image
                             source={{ uri: item.member_detail.profile_picture }}
                             style={styles.avatarImg}
+                            transition={200}
                         />
                     ) : (
                         <Text style={styles.avatarInitial}>

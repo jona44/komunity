@@ -1,7 +1,9 @@
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
-const API_BASE_URL = 'http://192.168.88.243:8000/api/v1/'; // Use machine IP for mobile devices
+import { Platform } from 'react-native';
+
+const API_BASE_URL = 'http://192.168.88.236:8000/api/v1/'; // Use machine IP for mobile devices
 
 const TOKEN_KEY = 'komunity_auth_token';
 
@@ -23,7 +25,11 @@ export const setAuthToken = (token: string | null) => {
 /** Save auth token to secure storage */
 export const saveToken = async (token: string): Promise<void> => {
     try {
-        await SecureStore.setItemAsync(TOKEN_KEY, token);
+        if (Platform.OS === 'web') {
+            localStorage.setItem(TOKEN_KEY, token);
+        } else {
+            await SecureStore.setItemAsync(TOKEN_KEY, token);
+        }
     } catch (error) {
         console.error('Error saving token to secure storage:', error);
     }
@@ -32,7 +38,13 @@ export const saveToken = async (token: string): Promise<void> => {
 /** Load auth token from secure storage and set it on the client */
 export const loadToken = async (): Promise<string | null> => {
     try {
-        const token = await SecureStore.getItemAsync(TOKEN_KEY);
+        let token: string | null = null;
+        if (Platform.OS === 'web') {
+            token = localStorage.getItem(TOKEN_KEY);
+        } else {
+            token = await SecureStore.getItemAsync(TOKEN_KEY);
+        }
+
         if (token) {
             setAuthToken(token);
         }
@@ -47,7 +59,11 @@ export const loadToken = async (): Promise<string | null> => {
 export const clearToken = async (): Promise<void> => {
     try {
         setAuthToken(null);
-        await SecureStore.deleteItemAsync(TOKEN_KEY);
+        if (Platform.OS === 'web') {
+            localStorage.removeItem(TOKEN_KEY);
+        } else {
+            await SecureStore.deleteItemAsync(TOKEN_KEY);
+        }
     } catch (error) {
         console.error('Error clearing token from secure storage:', error);
     }

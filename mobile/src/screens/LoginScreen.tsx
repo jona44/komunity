@@ -5,9 +5,10 @@ import client, { setAuthToken, saveToken } from '../api/client';
 interface LoginProps {
     onLoginSuccess: () => void;
     onShowSignUp: () => void;
+    onForgotPassword: () => void;
 }
 
-const LoginScreen = ({ onLoginSuccess, onShowSignUp }: LoginProps) => {
+const LoginScreen = ({ onLoginSuccess, onShowSignUp, onForgotPassword }: LoginProps) => {
     const [email, setEmail] = React.useState('');
     const [password, setPassword] = React.useState('');
     const [loading, setLoading] = React.useState(false);
@@ -74,6 +75,13 @@ const LoginScreen = ({ onLoginSuccess, onShowSignUp }: LoginProps) => {
                 />
 
                 <TouchableOpacity
+                    style={styles.forgotPasswordContainer}
+                    onPress={onForgotPassword}
+                >
+                    <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
                     style={[styles.button, loading && styles.buttonDisabled]}
                     onPress={handleLogin}
                     disabled={loading}
@@ -128,6 +136,15 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         marginBottom: 16,
         fontSize: 16,
+    },
+    forgotPasswordContainer: {
+        alignItems: 'flex-end',
+        marginBottom: 16,
+    },
+    forgotPasswordText: {
+        color: '#2563eb',
+        fontWeight: 'bold',
+        fontSize: 14,
     },
     button: {
         backgroundColor: '#2563eb',

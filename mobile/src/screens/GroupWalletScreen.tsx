@@ -29,6 +29,7 @@ const GroupWalletScreen = ({ group, onBack }: GroupWalletScreenProps) => {
     const [balance, setBalance] = useState<string>(group.balance || '0.00');
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [accessDenied, setAccessDenied] = useState(false);
 
     useEffect(() => {
         fetchData();
@@ -36,15 +37,28 @@ const GroupWalletScreen = ({ group, onBack }: GroupWalletScreenProps) => {
 
     const fetchData = async () => {
         try {
-            const [walletRes, transRes] = await Promise.all([
-                client.get(`groups/${group.id}/`),
-                client.get(`groups/${group.id}/transactions/`)
-            ]);
-            setBalance(walletRes.data.balance);
-            setTransactions(transRes.data);
+            // First, try to get group details for the balance
+            try {
+                const walletRes = await client.get(`groups/${group.id}/`);
+                setBalance(walletRes.data.balance);
+            } catch (err) {
+                console.error('Error fetching group balance:', err);
+            }
+
+            // Then try to get transactions
+            try {
+                const transRes = await client.get(`groups/${group.id}/transactions/`);
+                setTransactions(transRes.data);
+                setAccessDenied(false);
+            } catch (err: any) {
+                console.error('Error fetching transactions:', err);
+                if (err.response?.status === 403) {
+                    setAccessDenied(true);
+                    setTransactions([]);
+                }
+            }
         } catch (error) {
-            console.error('Error fetching group wallet data:', error);
-            Alert.alert('Error', 'Failed to load group wallet information');
+            console.error('Error in fetching group wallet data:', error);
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -99,6 +113,14 @@ const GroupWalletScreen = ({ group, onBack }: GroupWalletScreenProps) => {
 
     return (
         <View style={styles.container}>
+            <View style={[styles.header, { paddingTop: insets.top }]}>
+                <TouchableOpacity onPress={onBack} style={styles.backButton}>
+                    <Text style={styles.backButtonText}>←</Text>
+                </TouchableOpacity>
+                <Text style={styles.headerTitle}>Community Wallet</Text>
+                <View style={{ width: 40 }} />
+            </View>
+
             <ScrollView
                 style={styles.content}
                 refreshControl={
@@ -121,7 +143,11 @@ const GroupWalletScreen = ({ group, onBack }: GroupWalletScreenProps) => {
 
                 {transactions.length === 0 ? (
                     <View style={styles.emptyState}>
-                        <Text style={styles.emptyStateText}>No transactions yet.</Text>
+                        <Text style={styles.emptyStateText}>
+                            {accessDenied
+                                ? "Visibility restricted to active community members."
+                                : "No transactions yet."}
+                        </Text>
                     </View>
                 ) : (
                     transactions.map((item) => (
@@ -170,7 +196,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 16,
-        paddingVertical: 16,
+        paddingBottom: 16,
         backgroundColor: '#ffffff',
         borderBottomWidth: 1,
         borderBottomColor: '#e5e7eb',
@@ -194,7 +220,7 @@ const styles = StyleSheet.create({
         color: '#111827',
     },
     content: {
-        marginHorizontal: 16,
+        paddingHorizontal: 16,
     },
     balanceCard: {
         backgroundColor: '#2563eb',
@@ -247,6 +273,7 @@ const styles = StyleSheet.create({
     emptyStateText: {
         color: '#6b7280',
         fontSize: 16,
+        textAlign: 'center',
     },
     transactionItem: {
         flexDirection: 'row',

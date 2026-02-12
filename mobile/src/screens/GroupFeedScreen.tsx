@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, Image, ActivityIndicator, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, Dimensions, RefreshControl, Share } from 'react-native';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
 import client from '../api/client';
+import { FeedPlaceholder } from '../components/Loaders';
 
 interface Author {
     id: number;
@@ -46,7 +49,12 @@ const ImageCarousel = ({ images }: { images: { id: number; image: string }[] }) 
                 keyExtractor={(item) => item.id.toString()}
                 onScroll={onScroll}
                 renderItem={({ item }) => (
-                    <Image source={{ uri: item.image }} style={styles.postImage} />
+                    <Image
+                        source={{ uri: item.image }}
+                        style={styles.postImage}
+                        transition={200}
+                        contentFit="cover"
+                    />
                 )}
             />
             {images.length > 1 && (
@@ -64,9 +72,13 @@ const GroupFeedScreen = ({ group, onBack, onSelectPost, onCreatePost }: GroupFee
     const insets = useSafeAreaInsets();
     const [posts, setPosts] = useState<Post[]>([]);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [nextPage, setNextPage] = useState<string | null>(null);
+    const [hasMore, setHasMore] = useState(true);
 
     useEffect(() => {
-        fetchPosts();
+        fetchPosts(1);
         markAsRead();
     }, []);
 
@@ -78,27 +90,67 @@ const GroupFeedScreen = ({ group, onBack, onSelectPost, onCreatePost }: GroupFee
         }
     };
 
-    const fetchPosts = async () => {
+    const fetchPosts = async (page: number = 1) => {
         try {
-            const response = await client.get(`posts/?group_id=${group.id}`);
-            setPosts(response.data);
+            const response = await client.get(`posts/?group_id=${group.id}&page=${page}`);
+            const data = response.data;
+
+            // Handle both paginated { results, next } and flat array responses
+            const newPosts = Array.isArray(data) ? data : data.results || [];
+            const nextUrl = Array.isArray(data) ? null : data.next;
+
+            if (page === 1) {
+                setPosts(newPosts);
+            } else {
+                setPosts(prev => [...prev, ...newPosts]);
+            }
+            setNextPage(nextUrl);
+            setHasMore(!!nextUrl);
         } catch (error) {
             console.error('Error fetching posts:', error);
         } finally {
             setLoading(false);
+            setRefreshing(false);
+            setLoadingMore(false);
         }
     };
 
+    const onRefresh = () => {
+        setRefreshing(true);
+        fetchPosts(1);
+        markAsRead();
+    };
+
+    const loadMore = () => {
+        if (!hasMore || loadingMore || !nextPage) return;
+        setLoadingMore(true);
+        // Extract page number from next URL
+        const pageMatch = nextPage.match(/page=(\d+)/);
+        const page = pageMatch ? parseInt(pageMatch[1]) : 2;
+        fetchPosts(page);
+    };
+
     const formatDate = (dateString: string) => {
-        if (!dateString) return '';
         const date = new Date(dateString);
         return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     };
 
+    const handleShare = async (post: Post) => {
+        try {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            const shareUrl = `komunity://post/${post.id}`;
+            await Share.share({
+                message: `${post.author_detail.full_name} shared a post in Komunity!\n\n"${post.content}"\n\nView here: ${shareUrl}`,
+            });
+        } catch (error) {
+            console.error('Error sharing:', error);
+        }
+    };
+
     if (loading) {
         return (
-            <View style={styles.centered}>
-                <ActivityIndicator size="large" color="#2563eb" />
+            <View style={{ flex: 1, backgroundColor: '#ffffff' }}>
+                <FeedPlaceholder />
             </View>
         );
     }
@@ -109,6 +161,14 @@ const GroupFeedScreen = ({ group, onBack, onSelectPost, onCreatePost }: GroupFee
                 data={posts}
                 keyExtractor={(item) => item.id.toString()}
                 contentContainerStyle={styles.listContent}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        colors={['#2563eb']}
+                        tintColor="#2563eb"
+                    />
+                }
                 renderItem={({ item }) => (
                     <TouchableOpacity
                         style={styles.postCard}
@@ -121,6 +181,7 @@ const GroupFeedScreen = ({ group, onBack, onSelectPost, onCreatePost }: GroupFee
                                     <Image
                                         source={{ uri: item.author_detail.profile_picture }}
                                         style={styles.avatarImage}
+                                        transition={200}
                                     />
                                 ) : (
                                     <Text style={styles.avatarInitial}>
@@ -148,7 +209,7 @@ const GroupFeedScreen = ({ group, onBack, onSelectPost, onCreatePost }: GroupFee
                             >
                                 <Text style={styles.footerActionText}>💬 {item.comment_count} comments</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity style={styles.footerAction}>
+                            <TouchableOpacity style={styles.footerAction} onPress={() => handleShare(item)}>
                                 <Text style={styles.footerActionText}>🚀 share</Text>
                             </TouchableOpacity>
                         </View>
@@ -158,6 +219,15 @@ const GroupFeedScreen = ({ group, onBack, onSelectPost, onCreatePost }: GroupFee
                     <View style={styles.emptyContainer}>
                         <Text style={styles.emptyText}>No posts yet. Be the first to share!</Text>
                     </View>
+                }
+                onEndReached={loadMore}
+                onEndReachedThreshold={0.3}
+                ListFooterComponent={
+                    loadingMore ? (
+                        <View style={{ paddingVertical: 20 }}>
+                            <ActivityIndicator size="small" color="#2563eb" />
+                        </View>
+                    ) : null
                 }
             />
 

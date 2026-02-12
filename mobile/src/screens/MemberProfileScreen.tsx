@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import {
-    View, Text, StyleSheet, Image, ScrollView,
+    View, Text, StyleSheet, ScrollView,
     TouchableOpacity, ActivityIndicator, Alert, Dimensions
 } from 'react-native';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import client from '../api/client';
 
@@ -63,7 +64,11 @@ const MemberProfileScreen = ({ membership, isAdmin, onBack, onStatusChange }: Me
                 <View style={styles.profileHero}>
                     <View style={styles.avatarContainer}>
                         {profile.profile_picture ? (
-                            <Image source={{ uri: profile.profile_picture }} style={styles.avatar} />
+                            <Image
+                                source={{ uri: profile.profile_picture }}
+                                style={styles.avatar}
+                                transition={200}
+                            />
                         ) : (
                             <View style={[styles.avatar, styles.placeholderAvatar]}>
                                 <Text style={styles.placeholderInitial}>

@@ -3,7 +3,8 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     ProfileViewSet, GroupViewSet, PostViewSet, CommentViewSet, 
     DeceasedViewSet, ContributionViewSet, WalletViewSet, PostImageViewSet,
-    TransactionViewSet, UserViewSet, ReplyViewSet, GroupMembershipViewSet
+    TransactionViewSet, UserViewSet, ReplyViewSet, GroupMembershipViewSet,
+    DeviceTokenViewSet, password_reset_request, search_api_view
 )
 from rest_framework.authtoken.views import obtain_auth_token
 
@@ -20,8 +21,12 @@ router.register(r'contributions', ContributionViewSet)
 router.register(r'wallets', WalletViewSet, basename='wallet')
 router.register(r'transactions', TransactionViewSet, basename='transactions')
 router.register(r'users', UserViewSet, basename='users')
+router.register(r'device-tokens', DeviceTokenViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),
     path('auth-token/', obtain_auth_token, name='auth_token'),
+    path('password-reset/', password_reset_request, name='api_password_reset'),
+    path('search/', search_api_view, name='api_search'),
 ]
+
